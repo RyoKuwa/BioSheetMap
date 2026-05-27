@@ -22,8 +22,8 @@
           <div id="dataset-section-title" class="menu-section-title">データ</div>
           <div class="control-row dataset-row">
             <label class="dataset-control" for="dataset-select">
-              <span>調査名</span>
-              <select id="dataset-select" aria-label="調査名"></select>
+              <span>地図名</span>
+              <select id="dataset-select" aria-label="地図名"></select>
             </label>
             <div class="dataset-button-group" aria-label="データの操作">
               <button id="dataset-add-button" type="button">新規作成</button>
@@ -93,7 +93,7 @@
             <p class="modal-note">スプレッドシートの準備や必要な列については、メニューの「使い方」を確認してください。</p>
 
             <label class="modal-field" for="dataset-name-input">
-              <span>調査名</span>
+              <span>地図名</span>
               <input id="dataset-name-input" type="text" autocomplete="off" placeholder="例: XX大学周辺の生物相、四国の爬虫類" />
             </label>
 
@@ -111,7 +111,7 @@
 
             <div class="dataset-field-loader">
               <button id="dataset-load-fields-button" type="button" class="secondary-button compact-button">列を読み込む</button>
-              <small>スプレッドシートの1行目のヘッダーを読み込み、位置情報・色分け・マーカー形状・ポップアップ・フィルターに使う項目を選択します。</small>
+                <small>スプレッドシートの1行目のヘッダーを読み込み、位置情報・マーカーの色や形・ポップアップ・フィルターに使う項目を選択します。</small>
             </div>
 
             <div id="dataset-fields-status" class="dataset-fields-status" role="status" hidden></div>
@@ -136,12 +136,24 @@
                 <small>初期状態では未選択です。選択しない場合、マーカーは灰色で表示されます。</small>
               </label>
 
+              <section class="dataset-fieldset" aria-labelledby="dataset-legend-label-fields-title">
+                <div id="dataset-legend-label-fields-title" class="dataset-fieldset-title">凡例ラベルに使用する列</div>
+                <small>未選択の場合、色分けに使用する項目の値を凡例に表示します。複数選ぶと、選んだ順に「 / 」でつないで表示します。</small>
+                <div id="dataset-legend-label-fields-list" class="dataset-field-list"></div>
+              </section>
+
+              <label class="modal-field" for="dataset-scientific-name-field-select">
+                <span>学名として斜体化する列</span>
+                <select id="dataset-scientific-name-field-select"></select>
+                <small>選択した列がポップアップや凡例に表示されるとき、学名として斜体化します。</small>
+              </label>
+
               <section class="dataset-fieldset" aria-labelledby="dataset-marker-shape-fields-title">
                 <div id="dataset-marker-shape-fields-title" class="dataset-fieldset-title">マーカー形状に使用する項目</div>
                 <label class="modal-field" for="dataset-marker-shape-field-select">
                   <span>形状を分ける項目</span>
                   <select id="dataset-marker-shape-field-select"></select>
-                  <small>未選択の場合、すべて塗りつぶし丸で表示されます。複数の記録が近接して1つにまとめられる場合は、形状リストで上にあるものほど代表マーカーとして優先されます。</small>
+                  <small>未選択の場合、すべて塗りつぶし丸で表示されます。複数の記録が近接して1つにまとめられる場合は、形状設定で上にある値ほど代表マーカーとして優先されます。</small>
                 </label>
                 <div id="dataset-marker-shape-map" class="dataset-shape-map"></div>
               </section>
@@ -205,7 +217,7 @@
           <section class="help-content-section">
             <h3>この地図でできること</h3>
             <p>Googleスプレッドシートまたは公開CSVにまとめた記録を、地図上に表示できます。</p>
-            <p>地図ごとに、緯度・経度として使う列、マーカーの色分けに使う列、マーカー形状に使う列、ポップアップに表示する列、フィルターに使う列を設定できます。設定は閲覧者のブラウザに保存され、プルダウンから切り替えられます。スプレッドシートやCSVの記録データそのものは保存されません。</p>
+            <p>地図ごとに、緯度・経度として使う列、マーカーの色分けに使う列、凡例ラベルに使う列、マーカー形状に使う列、学名として斜体化する列、ポップアップに表示する列、フィルターに使う列を設定できます。設定は閲覧者のブラウザに保存され、プルダウンから切り替えられます。スプレッドシートやCSVの記録データそのものは保存されません。</p>
           </section>
 
           <section class="help-content-section">
@@ -224,9 +236,9 @@
             <h3>3. 地図を作成する</h3>
             <ol>
               <li>「新規作成」を押します。</li>
-              <li>調査名を入力し、GoogleスプレッドシートのURLまたは公開CSVのURLを指定します。Googleスプレッドシートを使う場合は、必要に応じてシート名も指定します。</li>
+              <li>地図名を入力し、GoogleスプレッドシートのURLまたは公開CSVのURLを指定します。Googleスプレッドシートを使う場合は、必要に応じてシート名も指定します。</li>
               <li>「列を読み込む」を押すと、1行目の列名が読み込まれます。緯度・経度として使う列を確認し、必要に応じて変更してください。</li>
-              <li>続いて、マーカーの色分け、マーカー形状、ポップアップ、フィルターに使う列を選びます。設定が完了したら登録します。</li>
+              <li>続いて、マーカーの色分け、凡例ラベル、マーカー形状、学名の斜体化、ポップアップ、フィルターに使う列を選びます。設定が完了したら登録します。</li>
             </ol>
             <p>作成した地図の設定は、この端末のブラウザに保存されます。スプレッドシートやCSVの記録データそのものは保存されません。</p>
           </section>
@@ -235,14 +247,14 @@
             <h3>4. 表示を調整する</h3>
             <p>登録後も、「編集」から表示設定を変更できます。</p>
             <p>色分けに使う列を選ばない場合、マーカーは灰色で表示されます。マーカー形状に使う列を選ばない場合、すべてのマーカーは塗りつぶし丸で表示されます。</p>
-            <p>ポップアップに表示する列や、フィルターに使う列も変更できます。地図の読み込み時には、表示や絞り込みに必要な列だけを取得します。</p>
+            <p>凡例ラベルに使う列、学名として斜体化する列、ポップアップに表示する列、フィルターに使う列も変更できます。地図の読み込み時には、表示や絞り込みに必要な列だけを取得します。</p>
           </section>
 
           <section class="help-content-section">
             <h3>5. 地図を見る</h3>
             <p>マーカーを押すと、記録のポップアップが開きます。</p>
             <p>近い位置にある複数の記録は、1つの代表マーカーにまとめて表示されます。まとめられた記録は、ポップアップ内の「前へ」「次へ」で切り替えられます。</p>
-            <p>複数の記録が1つの代表マーカーにまとめられる場合は、形状リストで上にある形が優先されます。</p>
+            <p>複数の記録が1つの代表マーカーにまとめられる場合は、形状設定で上にある値が優先されます。</p>
             <p>現在地ボタンは、現地で自分の位置を確認するときの補助として使えます。フォーカスボタンを押すと、現在表示されている記録全体が地図に収まるように表示範囲が調整されます。</p>
           </section>
 
@@ -250,13 +262,13 @@
             <h3>6. フィルターと凡例</h3>
             <p>「フィルター」から、表示する記録を絞り込めます。同じ項目内ではOR条件、異なる項目どうしではAND条件になります。</p>
             <p>たとえば、分類群でAとBを選び、記録の種類で「文献記録」を選んだ場合は、「分類群がAまたはB」で、かつ「記録の種類が文献記録」の記録だけが表示されます。</p>
-            <p>凡例には、現在表示されている記録のうち、マーカーの色分けや形状に使われている値だけが表示されます。</p>
+            <p>凡例には、現在表示されている記録のうち、マーカーの色分けや形状に使われている値だけが表示されます。凡例ラベルに使う列を指定した場合は、その列の値を凡例に表示します。</p>
           </section>
 
           <section class="help-content-section">
             <h3>7. 共有する</h3>
             <p>「共有」から、同じデータを同じ表示設定で開くためのリンクを作成できます。</p>
-            <p>共有リンクには、調査名、データURL、シート名、背景地図、色分け、ポップアップ、フィルターなどの設定が含まれます。現在の地図中心やズームは共有されません。</p>
+            <p>共有リンクには、地図名、データURL、シート名、背景地図、色分け、凡例ラベル、学名の斜体化、ポップアップ、フィルターなどの設定が含まれます。現在の地図中心やズームは共有されません。</p>
             <p>共有リンクから開いた地図をこのブラウザでも使い続ける場合は、「登録」を押してください。登録すると、次回からプルダウンで選択できます。</p>
           </section>
         </div>

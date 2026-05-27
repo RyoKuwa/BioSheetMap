@@ -184,6 +184,8 @@
   const datasetLatitudeFieldSelect = document.getElementById("dataset-latitude-field-select");
   const datasetLongitudeFieldSelect = document.getElementById("dataset-longitude-field-select");
   const datasetColorFieldSelect = document.getElementById("dataset-color-field-select");
+  const datasetLegendLabelFieldsList = document.getElementById("dataset-legend-label-fields-list");
+  const datasetScientificNameFieldSelect = document.getElementById("dataset-scientific-name-field-select");
   const datasetMarkerShapeFieldSelect = document.getElementById("dataset-marker-shape-field-select");
   const datasetMarkerShapeMap = document.getElementById("dataset-marker-shape-map");
   const datasetPopupTitleFieldSelect = document.getElementById("dataset-popup-title-field-select");
@@ -325,6 +327,8 @@
           latitudeField: normalizeDatasetFieldName(dataset.latitudeField),
           longitudeField: normalizeDatasetFieldName(dataset.longitudeField),
           colorField: normalizeDatasetFieldName(dataset.colorField),
+          legendLabelFields: normalizeOptionalFieldList(dataset.legendLabelFields),
+          scientificNameField: normalizeDatasetFieldName(dataset.scientificNameField),
           markerShapeField: normalizeDatasetFieldName(dataset.markerShapeField),
           markerShapeMap: normalizeMarkerShapeMap(dataset.markerShapeMap),
           popupTitleField: normalizeDatasetFieldName(dataset.popupTitleField),
@@ -333,7 +337,7 @@
         }))
         .filter((dataset) => dataset.id && dataset.name && (dataset.spreadsheetId || dataset.csvUrl));
     } catch (error) {
-      console.warn("登録済み調査名を読み取れませんでした。", error);
+      console.warn("登録済み地図名を読み取れませんでした。", error);
       return [];
     }
   }
@@ -392,6 +396,8 @@
       latitudeField: normalizeDatasetFieldName(params.get("fm_lat")),
       longitudeField: normalizeDatasetFieldName(params.get("fm_lng")),
       colorField: normalizeDatasetFieldName(params.get("fm_color")),
+      legendLabelFields: parseFieldListParam(params.get("fm_legend_label")),
+      scientificNameField: normalizeDatasetFieldName(params.get("fm_scientific")),
       markerShapeField: normalizeDatasetFieldName(params.get("fm_shape_field")),
       markerShapeMap: parseMarkerShapeMapParam(params.get("fm_shape_map")),
       popupTitleField: normalizeDatasetFieldName(params.get("fm_popup_title")),
@@ -608,8 +614,15 @@
     return FILTER_FIELD_LABEL_OVERRIDES[field] || field;
   }
 
-  function isTaxonField(field) {
-    return normalizeDatasetFieldName(field) === COLUMNS.taxon;
+  function configuredScientificNameField(dataset, headers = state.headers) {
+    const scientificNameField = normalizeDatasetFieldName(dataset?.scientificNameField);
+    if (!scientificNameField) return "";
+    return normalizeFieldsForHeaders([scientificNameField], headers)[0] || "";
+  }
+
+  function isScientificNameField(field, dataset = getActiveDataset(), headers = state.headers) {
+    const scientificNameField = configuredScientificNameField(dataset, headers);
+    return !!scientificNameField && fieldsReferToSameHeader(field, scientificNameField);
   }
 
   function fieldsReferToSameHeader(a, b) {
@@ -633,6 +646,11 @@
 
   function configuredFilterFields(dataset, headers) {
     const source = Array.isArray(dataset?.filterFields) ? dataset.filterFields : [];
+    return normalizeFieldsForHeaders(source, headers);
+  }
+
+  function configuredLegendLabelFields(dataset, headers = state.headers) {
+    const source = Array.isArray(dataset?.legendLabelFields) ? dataset.legendLabelFields : [];
     return normalizeFieldsForHeaders(source, headers);
   }
 
@@ -664,7 +682,7 @@
     const sourceUrl = normalizeText(urlInput);
     const sheetName = normalizeText(sheetNameInput) || CONFIG.DEFAULT_SHEET_NAME || "シート1";
 
-    if (!name) throw new Error("調査名を入力してください。");
+    if (!name) throw new Error("地図名を入力してください。");
     if (!sourceUrl) throw new Error("GoogleスプレッドシートURLを入力してください。");
 
     const spreadsheetId = extractSpreadsheetId(sourceUrl);
@@ -676,6 +694,7 @@
     const now = new Date().toISOString();
     const hasPopupFields = Array.isArray(settings.popupFields);
     const hasFilterFields = Array.isArray(settings.filterFields);
+    const hasLegendLabelFields = Array.isArray(settings.legendLabelFields);
     const latitudeField = normalizeDatasetFieldName(settings.latitudeField ?? existing?.latitudeField);
     const longitudeField = normalizeDatasetFieldName(settings.longitudeField ?? existing?.longitudeField);
     const markerShapeField = normalizeDatasetFieldName(settings.markerShapeField ?? existing?.markerShapeField);
@@ -692,6 +711,8 @@
       latitudeField,
       longitudeField,
       colorField: normalizeDatasetFieldName(settings.colorField ?? existing?.colorField),
+      legendLabelFields: hasLegendLabelFields ? uniqueFieldList(settings.legendLabelFields) : normalizeOptionalFieldList(existing?.legendLabelFields),
+      scientificNameField: normalizeDatasetFieldName(settings.scientificNameField ?? existing?.scientificNameField),
       markerShapeField,
       markerShapeMap: markerShapeField ? normalizeMarkerShapeMap(settings.markerShapeMap ?? existing?.markerShapeMap) : {},
       popupTitleField: normalizeDatasetFieldName(settings.popupTitleField ?? existing?.popupTitleField),
@@ -820,16 +841,33 @@
     return MARKER_SHAPE_BY_ID.get(normalizeMarkerShapeId(shapeId))?.label || "● 塗りつぶし丸";
   }
 
+  function markerShapeSymbol(shapeId) {
+    return markerShapeLabel(shapeId).split(/\s+/)[0] || "●";
+  }
+
   function populateMarkerShapeSelect(select, selectedValue) {
     if (!select) return;
     select.innerHTML = "";
     MARKER_SHAPES.forEach((shape) => {
       const option = document.createElement("option");
       option.value = shape.id;
-      option.textContent = shape.label;
+      option.textContent = markerShapeSymbol(shape.id);
+      option.title = shape.label;
+      option.setAttribute("aria-label", shape.label);
       select.appendChild(option);
     });
     select.value = normalizeMarkerShapeId(selectedValue);
+  }
+
+  function moveMarkerShapeMapRow(button, direction) {
+    const row = button.closest(".dataset-shape-map-row");
+    const list = row?.parentElement;
+    if (!row || !list) return;
+    if (direction < 0 && row.previousElementSibling) {
+      list.insertBefore(row, row.previousElementSibling);
+    } else if (direction > 0 && row.nextElementSibling) {
+      list.insertBefore(row.nextElementSibling, row);
+    }
   }
 
   function currentMarkerShapeMapFromModal() {
@@ -854,6 +892,20 @@
     return [...values].sort((a, b) => a.localeCompare(b, "ja"));
   }
 
+  function orderMarkerShapeValues(values, shapeMap = {}) {
+    const available = new Set(values);
+    const ordered = [];
+    Object.keys(shapeMap).forEach((value) => {
+      if (!available.has(value) || ordered.includes(value)) return;
+      ordered.push(value);
+    });
+    values
+      .filter((value) => !ordered.includes(value))
+      .sort((a, b) => a.localeCompare(b, "ja"))
+      .forEach((value) => ordered.push(value));
+    return ordered;
+  }
+
   function renderMarkerShapeMap(values, shapeMap = {}) {
     if (!datasetMarkerShapeMap) return;
     datasetMarkerShapeMap.innerHTML = "";
@@ -873,8 +925,8 @@
       return;
     }
 
-    values.forEach((value) => {
-      const row = document.createElement("label");
+    orderMarkerShapeValues(values, shapeMap).forEach((value) => {
+      const row = document.createElement("div");
       row.className = "dataset-shape-map-row";
 
       const valueEl = document.createElement("span");
@@ -894,7 +946,23 @@
       select.addEventListener("change", updatePreview);
       updatePreview();
 
-      row.append(valueEl, preview, select);
+      const actions = document.createElement("div");
+      actions.className = "dataset-shape-map-actions";
+
+      const up = document.createElement("button");
+      up.type = "button";
+      up.textContent = "↑";
+      up.setAttribute("aria-label", `${value}を上へ移動`);
+      up.addEventListener("click", () => moveMarkerShapeMapRow(up, -1));
+
+      const down = document.createElement("button");
+      down.type = "button";
+      down.textContent = "↓";
+      down.setAttribute("aria-label", `${value}を下へ移動`);
+      down.addEventListener("click", () => moveMarkerShapeMapRow(down, 1));
+
+      actions.append(up, down);
+      row.append(valueEl, preview, select, actions);
       datasetMarkerShapeMap.appendChild(row);
     });
   }
@@ -962,11 +1030,15 @@
     const latitudeField = configuredLatitudeField(existing, datasetModalHeaders);
     const longitudeField = configuredLongitudeField(existing, datasetModalHeaders);
     const colorField = configuredColorField(existing, datasetModalHeaders);
+    const legendLabelFields = configuredLegendLabelFields(existing, datasetModalHeaders);
+    const scientificNameField = configuredScientificNameField(existing, datasetModalHeaders);
     const markerShapeField = configuredMarkerShapeField(existing, datasetModalHeaders);
     const popupTitleField = configuredPopupTitleField(existing, datasetModalHeaders);
     populateDatasetFieldSelect(datasetLatitudeFieldSelect, datasetModalHeaders, latitudeField, "選択してください");
     populateDatasetFieldSelect(datasetLongitudeFieldSelect, datasetModalHeaders, longitudeField, "選択してください");
     populateDatasetFieldSelect(datasetColorFieldSelect, datasetModalHeaders, colorField);
+    renderDatasetCheckboxList(datasetLegendLabelFieldsList, datasetModalHeaders, legendLabelFields, { reorder: true });
+    populateDatasetFieldSelect(datasetScientificNameFieldSelect, datasetModalHeaders, scientificNameField);
     populateDatasetFieldSelect(datasetMarkerShapeFieldSelect, datasetModalHeaders, markerShapeField);
     populateDatasetFieldSelect(datasetPopupTitleFieldSelect, datasetModalHeaders, popupTitleField);
     renderMarkerShapeMap(markerShapeValuesFromLoadedRows(markerShapeField), configuredMarkerShapeMap(existing));
@@ -985,7 +1057,7 @@
     renderDatasetCheckboxList(datasetFilterFieldsList, filterAvailable, filterSelected);
 
     setDatasetFieldSettingsVisible(true);
-    setDatasetFieldsStatus("列を読み込みました。位置情報、色分け、マーカー形状、ポップアップ、フィルター項目を変更できます。", false);
+    setDatasetFieldsStatus("列を読み込みました。位置情報、マーカーの色や形、ポップアップ、フィルター項目を変更できます。", false);
     if (markerShapeField && !markerShapeValuesFromLoadedRows(markerShapeField).length) {
       loadMarkerShapeValuesForModal();
     }
@@ -1035,6 +1107,8 @@
         latitudeField: datasetModalExisting?.latitudeField || "",
         longitudeField: datasetModalExisting?.longitudeField || "",
         colorField: datasetModalExisting?.colorField || "",
+        legendLabelFields: Array.isArray(datasetModalExisting?.legendLabelFields) ? datasetModalExisting.legendLabelFields : null,
+        scientificNameField: datasetModalExisting?.scientificNameField || "",
         markerShapeField: datasetModalExisting?.markerShapeField || "",
         markerShapeMap: configuredMarkerShapeMap(datasetModalExisting),
         popupTitleField: datasetModalExisting?.popupTitleField || "",
@@ -1048,6 +1122,8 @@
       longitudeField: datasetLongitudeFieldSelect?.value || "",
       requireLocationFields: true,
       colorField: datasetColorFieldSelect?.value || "",
+      legendLabelFields: readCheckedDatasetFields(datasetLegendLabelFieldsList) || [],
+      scientificNameField: datasetScientificNameFieldSelect?.value || "",
       markerShapeField: datasetMarkerShapeFieldSelect?.value || "",
       markerShapeMap: currentMarkerShapeMapFromModal(),
       popupTitleField: datasetPopupTitleFieldSelect?.value || "",
@@ -1697,6 +1773,11 @@
     if (longitudeField) url.searchParams.set("fm_lng", longitudeField);
     const colorField = normalizeDatasetFieldName(dataset.colorField);
     if (colorField) url.searchParams.set("fm_color", colorField);
+    if (Array.isArray(dataset.legendLabelFields)) {
+      url.searchParams.set("fm_legend_label", JSON.stringify(uniqueFieldList(dataset.legendLabelFields)));
+    }
+    const scientificNameField = normalizeDatasetFieldName(dataset.scientificNameField);
+    if (scientificNameField) url.searchParams.set("fm_scientific", scientificNameField);
     const markerShapeField = normalizeDatasetFieldName(dataset.markerShapeField);
     if (markerShapeField) {
       url.searchParams.set("fm_shape_field", markerShapeField);
@@ -1855,6 +1936,13 @@
   function displayText(value) {
     const text = normalizeText(value);
     return text || "—";
+  }
+
+  function formatFieldValueHTML(field, value) {
+    const text = displayText(value);
+    return isScientificNameField(field) && normalizeText(value)
+      ? formatTaxonHTML(text)
+      : escapeHTML(text);
   }
 
   function parseNumber(value) {
@@ -3016,7 +3104,18 @@
     return normalizeMarkerShapeId(configuredMarkerShapeMap(dataset)[text] || DEFAULT_MARKER_SHAPE);
   }
 
+  function markerShapeValuePriority(record, dataset = getActiveDataset()) {
+    const shapeField = configuredMarkerShapeField(dataset, state.headers);
+    const value = normalizeText(record?.markerShapeValue);
+    if (!shapeField || !value) return null;
+    const order = Object.keys(configuredMarkerShapeMap(dataset));
+    const index = order.indexOf(value);
+    return index >= 0 ? 100000 - index : null;
+  }
+
   function getMarkerPriority(record) {
+    const valuePriority = markerShapeValuePriority(record);
+    if (valuePriority !== null) return valuePriority;
     return MARKER_SHAPE_BY_ID.get(normalizeMarkerShapeId(record?.markerShape))?.priority || 0;
   }
 
@@ -3569,6 +3668,8 @@
     addResolvedField(result, headers, configuredLongitudeField(dataset, headers));
 
     addResolvedField(result, headers, configuredColorField(dataset, headers));
+    configuredLegendLabelFields(dataset, headers).forEach((field) => addResolvedField(result, headers, field));
+    addResolvedField(result, headers, configuredScientificNameField(dataset, headers));
     addResolvedField(result, headers, configuredMarkerShapeField(dataset, headers));
     addResolvedField(result, headers, configuredPopupTitleField(dataset, headers));
 
@@ -3831,6 +3932,7 @@
 
   function getMarkerSegmentPriority(segment) {
     if (!segment) return 0;
+    if (segment.representative) return getMarkerPriority(segment.representative);
     return markerShapePriority(segment.kind);
   }
 
@@ -4241,7 +4343,7 @@
       title.appendChild(titleMarker);
 
       const titleText = document.createElement("span");
-      titleText.innerHTML = isTaxonField(titleField) && normalizeText(rawTitleValue)
+      titleText.innerHTML = isScientificNameField(titleField) && normalizeText(rawTitleValue)
         ? formatTaxonHTML(titleValue)
         : escapeHtml(titleValue);
 
@@ -4257,13 +4359,13 @@
       const value = field === COLUMNS.date
         ? (record.date || joinDateParts(record))
         : record.__values?.[field];
-      appendPopupRow(content, fieldLabel(field), value);
+      appendPopupRow(content, fieldLabel(field), value, field);
     });
 
     return content;
   }
 
-  function appendPopupRow(container, label, value) {
+  function appendPopupRow(container, label, value, field = "") {
     const row = document.createElement("div");
     row.className = "popup-row";
 
@@ -4273,7 +4375,7 @@
 
     const valueEl = document.createElement("div");
     valueEl.className = "popup-value";
-    valueEl.textContent = displayText(value);
+    valueEl.innerHTML = formatFieldValueHTML(field, value);
 
     row.appendChild(labelEl);
     row.appendChild(valueEl);
@@ -4479,8 +4581,10 @@
     if (recordTypeLegendEl.previousElementSibling) {
       recordTypeLegendEl.previousElementSibling.textContent = shapeField ? `形状：${fieldLabel(shapeField)}` : "マーカー形状";
     }
-    const values = [...new Set(records.map((record) => record.markerShapeValue || ""))].filter(Boolean)
-      .sort((a, b) => a.localeCompare(b, "ja"));
+    const values = orderMarkerShapeValues(
+      [...new Set(records.map((record) => record.markerShapeValue || ""))].filter(Boolean),
+      shapeMap
+    );
 
     if (!records.length || !shapeField || !values.length) {
       recordTypeLegendEl.innerHTML = "";
@@ -4531,11 +4635,15 @@
       return false;
     }
 
+    const labelFields = configuredLegendLabelFields(getActiveDataset(), state.headers);
+    const firstRecordByColorValue = new Map();
+    records.forEach((record) => {
+      const value = getRecordColorValue(record);
+      if (!firstRecordByColorValue.has(value)) firstRecordByColorValue.set(value, record);
+    });
+
     taxonLegendEl.innerHTML = values.map((value) => {
-      const label = colorValueLabel(value);
-      const labelHtml = colorField === COLUMNS.taxon
-        ? formatTaxonHTML(label)
-        : escapeHTML(label);
+      const labelHtml = legendLabelHTML(value, firstRecordByColorValue.get(value), labelFields, colorField);
       return `
         <div class="taxon-row">
           <span class="taxon-chip" style="background: ${colorForColorValue(value)}"></span>
@@ -4544,6 +4652,24 @@
     }).join("");
     setLegendBlockVisible(taxonLegendEl, true);
     return true;
+  }
+
+  function legendLabelHTML(colorValue, record, labelFields, colorField) {
+    if (labelFields.length && record) {
+      const parts = labelFields
+        .map((field) => {
+          const value = field === COLUMNS.date
+            ? (record.date || joinDateParts(record))
+            : record.__values?.[field];
+          return normalizeText(value) ? formatFieldValueHTML(field, value) : "";
+        })
+        .filter(Boolean);
+      if (parts.length) return parts.join(" / ");
+    }
+
+    const label = colorValueLabel(colorValue);
+    if (colorValue === COLOR_BY_UNKNOWN_KEY) return escapeHTML(label);
+    return formatFieldValueHTML(colorField, label);
   }
 
   function setupPopupClose() {
