@@ -5,16 +5,12 @@
   const COLUMNS = CONFIG.COLUMNS;
   const REQUIRED_HEADERS = [];
 
-  const LEGACY_TAXON_HEADER = "同定";
-  const LEGACY_LATITUDE_HEADER = "Latitude";
-  const LEGACY_LONGITUDE_HEADER = "Longitude";
-  const LEGACY_DATE_HEADER = "表示する日付";
-  const REJECTED_TAXON_HEADER = "Taxon";
   const VIRTUAL_COORDINATES_FIELD = "__coordinates";
   const DEFAULT_MARKER_COLOR = "#666666";
   const OTHER_MARKER_COLOR = "#9E9E9E";
   const COLOR_BY_UNKNOWN_KEY = "__field_map_color_unknown__";
   const MARKER_COLOR_MAX_SEGMENTS = 6;
+  const DEFAULT_MARKER_SHAPE = "circle-filled";
   const POPUP_NEARBY_MARKER_PIXELS = Number(CONFIG.POPUP_NEARBY_MARKER_PIXELS) || Number(CONFIG.PROXIMITY_PIXELS) || 10;
   const LOAD_TIMEOUT_MS = Number(CONFIG.LOAD_TIMEOUT_MS) || 30000;
   const LOAD_SLOW_NOTICE_MS = Number(CONFIG.LOAD_SLOW_NOTICE_MS) || 10000;
@@ -52,56 +48,30 @@
 
   const FILTER_FIELD_LABEL_OVERRIDES = {
     [COLUMNS.taxon]: "分類群",
-    [LEGACY_TAXON_HEADER]: "分類群",
     [COLUMNS.latitude]: "緯度",
-    [LEGACY_LATITUDE_HEADER]: "緯度",
     [COLUMNS.longitude]: "経度",
-    [LEGACY_LONGITUDE_HEADER]: "経度",
-    [COLUMNS.date]: "日付",
-    [LEGACY_DATE_HEADER]: "日付"
+    [COLUMNS.date]: "日付"
   };
-
-  const DEFAULT_POPUP_FIELDS = [
-    COLUMNS.recordType,
-    COLUMNS.locality,
-    VIRTUAL_COORDINATES_FIELD,
-    COLUMNS.date,
-    COLUMNS.repository,
-    COLUMNS.specimenId,
-    COLUMNS.id,
-    COLUMNS.remarks
-  ];
-
-  const DEFAULT_FILTER_FIELDS = [
-    COLUMNS.taxon,
-    COLUMNS.recordType,
-    COLUMNS.repository,
-    COLUMNS.year,
-    COLUMNS.month,
-    COLUMNS.day,
-    COLUMNS.date
-  ];
 
   const EMPTY_FILTER_VALUE = "__FIELD_MAP_EMPTY__";
 
-  const RECORD_TYPE_PRIORITY = {
-    // 代表記録の選択用。形状を最優先にするため、星 > 四角 > 丸 > ✕ > △ の順にする。
-    type: 300,
-    synonymType: 200,
-    thisStudy: 100,
-    literature: 90,
-    uncertain: 80,
-    unknown: 70
-  };
-
-  const RECORD_TYPE_LEGEND_ITEMS = [
-    { kind: "type", label: "タイプ産地" },
-    { kind: "synonymType", label: "シノニマイズされた種のタイプ産地" },
-    { kind: "thisStudy", label: "作成者の記録" },
-    { kind: "literature", label: "文献記録" },
-    { kind: "uncertain", label: "不確かな記録" },
-    { kind: "unknown", label: "その他" }
+  const MARKER_SHAPES = [
+    { id: "star-filled", label: "★ 塗りつぶし星", priority: 140 },
+    { id: "star-hollow", label: "☆ 中空の星", priority: 139 },
+    { id: "square-filled", label: "■ 塗りつぶし四角", priority: 130 },
+    { id: "square-hollow", label: "□ 中空の四角", priority: 129 },
+    { id: "diamond-filled", label: "◆ 塗りつぶし四角", priority: 120 },
+    { id: "diamond-hollow", label: "◇ 中空の四角", priority: 119 },
+    { id: "circle-filled", label: "● 塗りつぶし丸", priority: 110 },
+    { id: "circle-hollow", label: "○ 中空の丸", priority: 109 },
+    { id: "double-circle", label: "◎ 二重丸", priority: 108 },
+    { id: "triangle-up-filled", label: "▲ 塗りつぶし三角", priority: 100 },
+    { id: "triangle-up-hollow", label: "△ 中空の三角", priority: 99 },
+    { id: "triangle-down-filled", label: "▼ 塗りつぶし三角", priority: 98 },
+    { id: "triangle-down-hollow", label: "▽ 中空の三角", priority: 97 },
+    { id: "x", label: "✕ 印", priority: 90 }
   ];
+  const MARKER_SHAPE_BY_ID = new Map(MARKER_SHAPES.map((shape) => [shape.id, shape]));
 
   const DETAILED_MAP_ATTRIBUTION = "Imagery © <a href=\"https://www.esri.com/en-us/home\" target=\"_blank\" rel=\"noopener\">Esri</a>";
   const GSI_TILE_ATTRIBUTION = "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank' rel='noopener'>地理院タイル</a>";
@@ -214,6 +184,8 @@
   const datasetLatitudeFieldSelect = document.getElementById("dataset-latitude-field-select");
   const datasetLongitudeFieldSelect = document.getElementById("dataset-longitude-field-select");
   const datasetColorFieldSelect = document.getElementById("dataset-color-field-select");
+  const datasetMarkerShapeFieldSelect = document.getElementById("dataset-marker-shape-field-select");
+  const datasetMarkerShapeMap = document.getElementById("dataset-marker-shape-map");
   const datasetPopupTitleFieldSelect = document.getElementById("dataset-popup-title-field-select");
   const datasetPopupFieldsList = document.getElementById("dataset-popup-fields-list");
   const datasetFilterFieldsList = document.getElementById("dataset-filter-fields-list");
@@ -345,6 +317,8 @@
           latitudeField: normalizeDatasetFieldName(dataset.latitudeField),
           longitudeField: normalizeDatasetFieldName(dataset.longitudeField),
           colorField: normalizeDatasetFieldName(dataset.colorField),
+          markerShapeField: normalizeDatasetFieldName(dataset.markerShapeField),
+          markerShapeMap: normalizeMarkerShapeMap(dataset.markerShapeMap),
           popupTitleField: normalizeDatasetFieldName(dataset.popupTitleField),
           popupFields: normalizeOptionalFieldList(dataset.popupFields),
           filterFields: normalizeOptionalFieldList(dataset.filterFields)
@@ -410,6 +384,8 @@
       latitudeField: normalizeDatasetFieldName(params.get("fm_lat")),
       longitudeField: normalizeDatasetFieldName(params.get("fm_lng")),
       colorField: normalizeDatasetFieldName(params.get("fm_color")),
+      markerShapeField: normalizeDatasetFieldName(params.get("fm_shape_field")),
+      markerShapeMap: parseMarkerShapeMapParam(params.get("fm_shape_map")),
       popupTitleField: normalizeDatasetFieldName(params.get("fm_popup_title")),
       popupFields: parseFieldListParam(params.get("fm_popup")),
       filterFields: parseFieldListParam(params.get("fm_filter")),
@@ -454,10 +430,6 @@
   function normalizeDatasetFieldName(fieldName) {
     const field = normalizeText(fieldName);
     if (!field) return "";
-    if (field === LEGACY_TAXON_HEADER) return COLUMNS.taxon;
-    if (field === LEGACY_LATITUDE_HEADER) return COLUMNS.latitude;
-    if (field === LEGACY_LONGITUDE_HEADER) return COLUMNS.longitude;
-    if (field === LEGACY_DATE_HEADER) return COLUMNS.date;
     return field;
   }
 
@@ -477,6 +449,36 @@
     return Array.isArray(fields) ? uniqueFieldList(fields) : null;
   }
 
+  function isValidMarkerShape(shapeId) {
+    return MARKER_SHAPE_BY_ID.has(normalizeText(shapeId));
+  }
+
+  function normalizeMarkerShapeId(shapeId) {
+    const id = normalizeText(shapeId);
+    return isValidMarkerShape(id) ? id : DEFAULT_MARKER_SHAPE;
+  }
+
+  function normalizeMarkerShapeMap(map) {
+    if (!map || typeof map !== "object" || Array.isArray(map)) return {};
+    const result = {};
+    Object.entries(map).forEach(([value, shapeId]) => {
+      const key = normalizeText(value);
+      if (!key) return;
+      result[key] = normalizeMarkerShapeId(shapeId);
+    });
+    return result;
+  }
+
+  function parseMarkerShapeMapParam(value) {
+    const text = normalizeText(value);
+    if (!text) return {};
+    try {
+      return normalizeMarkerShapeMap(JSON.parse(text));
+    } catch (error) {
+      return {};
+    }
+  }
+
   function parseFieldListParam(value) {
     const text = normalizeText(value);
     if (!text) return null;
@@ -493,24 +495,7 @@
     const result = [];
     const seen = new Set();
     uniqueFieldList(fields).forEach((field) => {
-      let normalized = field;
-      if (field === COLUMNS.taxon && !available.has(field) && available.has(LEGACY_TAXON_HEADER)) {
-        normalized = LEGACY_TAXON_HEADER;
-      } else if (field === LEGACY_TAXON_HEADER && available.has(COLUMNS.taxon)) {
-        normalized = COLUMNS.taxon;
-      } else if (field === COLUMNS.latitude && !available.has(field) && available.has(LEGACY_LATITUDE_HEADER)) {
-        normalized = LEGACY_LATITUDE_HEADER;
-      } else if (field === LEGACY_LATITUDE_HEADER && available.has(COLUMNS.latitude)) {
-        normalized = COLUMNS.latitude;
-      } else if (field === COLUMNS.longitude && !available.has(field) && available.has(LEGACY_LONGITUDE_HEADER)) {
-        normalized = LEGACY_LONGITUDE_HEADER;
-      } else if (field === LEGACY_LONGITUDE_HEADER && available.has(COLUMNS.longitude)) {
-        normalized = COLUMNS.longitude;
-      } else if (field === COLUMNS.date && !available.has(field) && available.has(LEGACY_DATE_HEADER)) {
-        normalized = LEGACY_DATE_HEADER;
-      } else if (field === LEGACY_DATE_HEADER && available.has(COLUMNS.date)) {
-        normalized = COLUMNS.date;
-      }
+      const normalized = field;
       if (normalized === VIRTUAL_COORDINATES_FIELD && includeVirtual) {
         if (!seen.has(normalized)) {
           seen.add(normalized);
@@ -634,12 +619,12 @@
   }
 
   function configuredPopupFields(dataset, headers) {
-    const source = Array.isArray(dataset?.popupFields) ? dataset.popupFields : DEFAULT_POPUP_FIELDS;
+    const source = Array.isArray(dataset?.popupFields) ? dataset.popupFields : [];
     return normalizeFieldsForHeaders(source, headers, { includeVirtual: true });
   }
 
   function configuredFilterFields(dataset, headers) {
-    const source = Array.isArray(dataset?.filterFields) ? dataset.filterFields : DEFAULT_FILTER_FIELDS;
+    const source = Array.isArray(dataset?.filterFields) ? dataset.filterFields : [];
     return normalizeFieldsForHeaders(source, headers);
   }
 
@@ -647,6 +632,16 @@
     const colorField = normalizeDatasetFieldName(dataset?.colorField);
     if (!colorField) return "";
     return normalizeFieldsForHeaders([colorField], headers)[0] || "";
+  }
+
+  function configuredMarkerShapeField(dataset, headers = state.headers) {
+    const markerShapeField = normalizeDatasetFieldName(dataset?.markerShapeField);
+    if (!markerShapeField) return "";
+    return normalizeFieldsForHeaders([markerShapeField], headers)[0] || "";
+  }
+
+  function configuredMarkerShapeMap(dataset) {
+    return normalizeMarkerShapeMap(dataset?.markerShapeMap);
   }
 
   function configuredPopupTitleField(dataset, headers = state.headers) {
@@ -675,6 +670,7 @@
     const hasFilterFields = Array.isArray(settings.filterFields);
     const latitudeField = normalizeDatasetFieldName(settings.latitudeField ?? existing?.latitudeField);
     const longitudeField = normalizeDatasetFieldName(settings.longitudeField ?? existing?.longitudeField);
+    const markerShapeField = normalizeDatasetFieldName(settings.markerShapeField ?? existing?.markerShapeField);
     if (settings.requireLocationFields && (!latitudeField || !longitudeField)) {
       throw new Error("緯度として使う列と経度として使う列を選択してください。");
     }
@@ -688,6 +684,8 @@
       latitudeField,
       longitudeField,
       colorField: normalizeDatasetFieldName(settings.colorField ?? existing?.colorField),
+      markerShapeField,
+      markerShapeMap: markerShapeField ? normalizeMarkerShapeMap(settings.markerShapeMap ?? existing?.markerShapeMap) : {},
       popupTitleField: normalizeDatasetFieldName(settings.popupTitleField ?? existing?.popupTitleField),
       popupFields: hasPopupFields ? uniqueFieldList(settings.popupFields) : normalizeOptionalFieldList(existing?.popupFields),
       filterFields: hasFilterFields ? uniqueFieldList(settings.filterFields) : normalizeOptionalFieldList(existing?.filterFields),
@@ -810,6 +808,141 @@
     select.value = selectedValue && fields.includes(selectedValue) ? selectedValue : "";
   }
 
+  function markerShapeLabel(shapeId) {
+    return MARKER_SHAPE_BY_ID.get(normalizeMarkerShapeId(shapeId))?.label || "● 塗りつぶし丸";
+  }
+
+  function populateMarkerShapeSelect(select, selectedValue) {
+    if (!select) return;
+    select.innerHTML = "";
+    MARKER_SHAPES.forEach((shape) => {
+      const option = document.createElement("option");
+      option.value = shape.id;
+      option.textContent = shape.label;
+      select.appendChild(option);
+    });
+    select.value = normalizeMarkerShapeId(selectedValue);
+  }
+
+  function currentMarkerShapeMapFromModal() {
+    const result = {};
+    if (!datasetMarkerShapeMap) return result;
+    datasetMarkerShapeMap.querySelectorAll("select[data-marker-shape-value]").forEach((select) => {
+      const value = normalizeText(select.dataset.markerShapeValue);
+      if (!value) return;
+      result[value] = normalizeMarkerShapeId(select.value);
+    });
+    return result;
+  }
+
+  function markerShapeValuesFromLoadedRows(field) {
+    const normalizedField = normalizeDatasetFieldName(field);
+    if (!normalizedField || !state.rows.length) return [];
+    const values = new Set();
+    state.rows.forEach((record) => {
+      const value = normalizeText(record.__values?.[normalizedField]);
+      if (value) values.add(value);
+    });
+    return [...values].sort((a, b) => a.localeCompare(b, "ja"));
+  }
+
+  function renderMarkerShapeMap(values, shapeMap = {}) {
+    if (!datasetMarkerShapeMap) return;
+    datasetMarkerShapeMap.innerHTML = "";
+    const selectedField = datasetMarkerShapeFieldSelect?.value || "";
+    if (!selectedField) {
+      const empty = document.createElement("p");
+      empty.className = "dataset-shape-map-empty";
+      empty.textContent = "形状を分ける項目が未選択です。";
+      datasetMarkerShapeMap.appendChild(empty);
+      return;
+    }
+    if (!values.length) {
+      const empty = document.createElement("p");
+      empty.className = "dataset-shape-map-empty";
+      empty.textContent = "この項目には選択できる値がありません。";
+      datasetMarkerShapeMap.appendChild(empty);
+      return;
+    }
+
+    values.forEach((value) => {
+      const row = document.createElement("label");
+      row.className = "dataset-shape-map-row";
+
+      const valueEl = document.createElement("span");
+      valueEl.className = "dataset-shape-map-value";
+      valueEl.textContent = value;
+
+      const preview = document.createElement("span");
+      preview.className = "dataset-shape-map-preview";
+
+      const select = document.createElement("select");
+      select.dataset.markerShapeValue = value;
+      populateMarkerShapeSelect(select, shapeMap[value] || DEFAULT_MARKER_SHAPE);
+      const updatePreview = () => {
+        const shape = normalizeMarkerShapeId(select.value);
+        preview.innerHTML = markerSvg(shape, [{ color: DEFAULT_MARKER_COLOR, kind: shape }]);
+      };
+      select.addEventListener("change", updatePreview);
+      updatePreview();
+
+      row.append(valueEl, preview, select);
+      datasetMarkerShapeMap.appendChild(row);
+    });
+  }
+
+  async function loadMarkerShapeValuesForModal() {
+    const field = datasetMarkerShapeFieldSelect?.value || "";
+    const shapeMap = {
+      ...configuredMarkerShapeMap(datasetModalExisting),
+      ...currentMarkerShapeMapFromModal()
+    };
+    if (!field) {
+      renderMarkerShapeMap([], shapeMap);
+      return;
+    }
+
+    const loadedValues = markerShapeValuesFromLoadedRows(field);
+    if (loadedValues.length) {
+      renderMarkerShapeMap(loadedValues, shapeMap);
+      return;
+    }
+
+    let draftDataset;
+    try {
+      draftDataset = normalizeDatasetInput(
+        datasetNameInput?.value || "一時読み込み",
+        datasetUrlInput?.value || "",
+        datasetSheetInput?.value || "",
+        datasetModalExisting,
+        { ...readDatasetModalSettings(), markerShapeField: field }
+      );
+    } catch (error) {
+      renderMarkerShapeMap([], shapeMap);
+      setDatasetFieldsStatus(error.message, true);
+      return;
+    }
+
+    setDatasetFieldsStatus("マーカー形状の候補値を読み込み中...", false);
+    if (datasetMarkerShapeFieldSelect) datasetMarkerShapeFieldSelect.disabled = true;
+    try {
+      const rowsResult = await loadSheetRows(draftDataset, {
+        fields: [field],
+        sourceHeaders: datasetModalHeaders
+      });
+      const values = [...new Set(rowsResult.rows.map((row) => normalizeText(row[field])).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, "ja"));
+      renderMarkerShapeMap(values, shapeMap);
+      setDatasetFieldsStatus("列を読み込みました。値ごとにマーカー形状を選択できます。", false);
+    } catch (error) {
+      console.error(error);
+      renderMarkerShapeMap([], shapeMap);
+      setDatasetFieldsStatus("マーカー形状の候補値を読み込めませんでした: " + error.message, true);
+    } finally {
+      if (datasetMarkerShapeFieldSelect) datasetMarkerShapeFieldSelect.disabled = false;
+    }
+  }
+
   function renderDatasetFieldSettings(headers, existing = datasetModalExisting) {
     datasetModalHeaders = availableSheetFields(headers);
     if (!datasetModalHeaders.length) {
@@ -821,11 +954,14 @@
     const latitudeField = configuredLatitudeField(existing, datasetModalHeaders);
     const longitudeField = configuredLongitudeField(existing, datasetModalHeaders);
     const colorField = configuredColorField(existing, datasetModalHeaders);
+    const markerShapeField = configuredMarkerShapeField(existing, datasetModalHeaders);
     const popupTitleField = configuredPopupTitleField(existing, datasetModalHeaders);
     populateDatasetFieldSelect(datasetLatitudeFieldSelect, datasetModalHeaders, latitudeField, "選択してください");
     populateDatasetFieldSelect(datasetLongitudeFieldSelect, datasetModalHeaders, longitudeField, "選択してください");
     populateDatasetFieldSelect(datasetColorFieldSelect, datasetModalHeaders, colorField);
+    populateDatasetFieldSelect(datasetMarkerShapeFieldSelect, datasetModalHeaders, markerShapeField);
     populateDatasetFieldSelect(datasetPopupTitleFieldSelect, datasetModalHeaders, popupTitleField);
+    renderMarkerShapeMap(markerShapeValuesFromLoadedRows(markerShapeField), configuredMarkerShapeMap(existing));
 
     const popupAvailable = availablePopupFields(datasetModalHeaders);
     const popupSelected = configuredPopupFields(existing, datasetModalHeaders);
@@ -841,7 +977,10 @@
     renderDatasetCheckboxList(datasetFilterFieldsList, filterAvailable, filterSelected);
 
     setDatasetFieldSettingsVisible(true);
-    setDatasetFieldsStatus("列を読み込みました。位置情報に使用する列、タイトル項目、表示項目、フィルター項目、色分け項目を変更できます。", false);
+    setDatasetFieldsStatus("列を読み込みました。位置情報、色分け、マーカー形状、ポップアップ、フィルター項目を変更できます。", false);
+    if (markerShapeField && !markerShapeValuesFromLoadedRows(markerShapeField).length) {
+      loadMarkerShapeValuesForModal();
+    }
   }
 
   async function loadDatasetFieldsForModal() {
@@ -888,6 +1027,8 @@
         latitudeField: datasetModalExisting?.latitudeField || "",
         longitudeField: datasetModalExisting?.longitudeField || "",
         colorField: datasetModalExisting?.colorField || "",
+        markerShapeField: datasetModalExisting?.markerShapeField || "",
+        markerShapeMap: configuredMarkerShapeMap(datasetModalExisting),
         popupTitleField: datasetModalExisting?.popupTitleField || "",
         popupFields: Array.isArray(datasetModalExisting?.popupFields) ? datasetModalExisting.popupFields : null,
         filterFields: Array.isArray(datasetModalExisting?.filterFields) ? datasetModalExisting.filterFields : null
@@ -899,6 +1040,8 @@
       longitudeField: datasetLongitudeFieldSelect?.value || "",
       requireLocationFields: true,
       colorField: datasetColorFieldSelect?.value || "",
+      markerShapeField: datasetMarkerShapeFieldSelect?.value || "",
+      markerShapeMap: currentMarkerShapeMapFromModal(),
       popupTitleField: datasetPopupTitleFieldSelect?.value || "",
       popupFields: readCheckedDatasetFields(datasetPopupFieldsList) || [],
       filterFields: readCheckedDatasetFields(datasetFilterFieldsList) || []
@@ -925,8 +1068,8 @@
     }
 
     datasetModalExisting = existing;
-    datasetModalTitle.textContent = existing ? "調査結果を編集" : "調査結果を追加";
-    datasetModalSubmitButton.textContent = existing ? "保存" : "登録";
+    datasetModalTitle.textContent = existing ? "地図を編集" : "地図を新規作成";
+    datasetModalSubmitButton.textContent = existing ? "保存" : "作成";
     datasetNameInput.value = existing?.name || "";
     datasetUrlInput.value = existing?.sourceUrl || existing?.spreadsheetId || existing?.csvUrl || "";
     datasetSheetInput.value = existing?.sheetName || CONFIG.DEFAULT_SHEET_NAME || "シート1";
@@ -1544,6 +1687,11 @@
     if (longitudeField) url.searchParams.set("fm_lng", longitudeField);
     const colorField = normalizeDatasetFieldName(dataset.colorField);
     if (colorField) url.searchParams.set("fm_color", colorField);
+    const markerShapeField = normalizeDatasetFieldName(dataset.markerShapeField);
+    if (markerShapeField) {
+      url.searchParams.set("fm_shape_field", markerShapeField);
+      url.searchParams.set("fm_shape_map", JSON.stringify(configuredMarkerShapeMap(dataset)));
+    }
     const popupTitleField = normalizeDatasetFieldName(dataset.popupTitleField);
     if (popupTitleField) url.searchParams.set("fm_popup_title", popupTitleField);
     if (Array.isArray(dataset.popupFields)) {
@@ -2417,6 +2565,10 @@
     return configuredColorField(getActiveDataset(), state.headers);
   }
 
+  function activeMarkerShapeField() {
+    return configuredMarkerShapeField(getActiveDataset(), state.headers);
+  }
+
   function colorValueLabel(value) {
     return value === COLOR_BY_UNKNOWN_KEY ? "未設定" : value;
   }
@@ -2846,18 +2998,16 @@
     };
   }
 
-  function recordKind(recordType) {
-    const text = normalizeText(recordType);
-    if (text === "タイプ産地") return "type";
-    if (text === "シノニマイズされた種のタイプ産地") return "synonymType";
-    if (text === "文献記録") return "literature";
-    if (text === "作成者の記録" || text === "本調査") return "thisStudy";
-    if (text === "不確かな記録") return "uncertain";
-    return "unknown";
+  function markerShapeForValue(value, dataset = getActiveDataset()) {
+    const shapeField = configuredMarkerShapeField(dataset, state.headers);
+    if (!shapeField) return DEFAULT_MARKER_SHAPE;
+    const text = normalizeText(value);
+    if (!text) return DEFAULT_MARKER_SHAPE;
+    return normalizeMarkerShapeId(configuredMarkerShapeMap(dataset)[text] || DEFAULT_MARKER_SHAPE);
   }
 
   function getMarkerPriority(record) {
-    return RECORD_TYPE_PRIORITY[recordKind(record?.recordType)] ?? 0;
+    return MARKER_SHAPE_BY_ID.get(normalizeMarkerShapeId(record?.markerShape))?.priority || 0;
   }
 
   function compareRecordsForRepresentative(a, b) {
@@ -2979,7 +3129,7 @@
     const dataset = getActiveDataset();
     if (!dataset) {
       resetMapDataForDatasetChange();
-      setStatus("調査結果を追加してください。");
+      setStatus("地図を新規作成してください。");
       renderDatasetControls();
       return;
     }
@@ -3112,17 +3262,52 @@
 
   function createFocusControl() {
     let container = null;
+
+    function createFocusIcon(doc) {
+      const svgNs = "http://www.w3.org/2000/svg";
+      const svg = doc.createElementNS(svgNs, "svg");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("aria-hidden", "true");
+      svg.classList.add("field-map-focus-icon");
+
+      const center = doc.createElementNS(svgNs, "circle");
+      center.setAttribute("cx", "12");
+      center.setAttribute("cy", "12");
+      center.setAttribute("r", "2.2");
+      center.setAttribute("fill", "currentColor");
+      svg.appendChild(center);
+
+      [
+        "M4 9V4H9",
+        "M15 4H20V9",
+        "M20 15V20H15",
+        "M9 20H4V15"
+      ].forEach((pathDef) => {
+        const path = doc.createElementNS(svgNs, "path");
+        path.setAttribute("d", pathDef);
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", "currentColor");
+        path.setAttribute("stroke-width", "2");
+        path.setAttribute("stroke-linecap", "round");
+        path.setAttribute("stroke-linejoin", "round");
+        svg.appendChild(path);
+      });
+
+      return svg;
+    }
+
     return {
-      onAdd() {
-        container = document.createElement("div");
+      onAdd(map) {
+        const doc = map?.getContainer?.().ownerDocument || document;
+        container = doc.createElement("div");
         container.className = "maplibregl-ctrl maplibregl-ctrl-group field-map-focus-control";
 
-        const button = document.createElement("button");
+        const button = doc.createElement("button");
         button.type = "button";
-        button.className = "field-map-focus-button";
+        button.className = "maplibregl-ctrl-icon field-map-focus-button";
         button.title = "表示中の記録範囲へ移動";
         button.setAttribute("aria-label", "表示中の記録範囲へ移動");
-        button.textContent = "◎";
+        button.appendChild(createFocusIcon(doc));
         button.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -3372,15 +3557,15 @@
     const result = [];
     addResolvedField(result, headers, configuredLatitudeField(dataset, headers));
     addResolvedField(result, headers, configuredLongitudeField(dataset, headers));
-    addResolvedField(result, headers, COLUMNS.recordType);
 
     addResolvedField(result, headers, configuredColorField(dataset, headers));
+    addResolvedField(result, headers, configuredMarkerShapeField(dataset, headers));
     addResolvedField(result, headers, configuredPopupTitleField(dataset, headers));
 
     configuredPopupFields(dataset, headers).forEach((field) => addResolvedField(result, headers, field));
     configuredFilterFields(dataset, headers).forEach((field) => addResolvedField(result, headers, field));
 
-    if (result.includes(COLUMNS.date) || result.includes(LEGACY_DATE_HEADER)) {
+    if (result.includes(COLUMNS.date)) {
       addResolvedField(result, headers, COLUMNS.year);
       addResolvedField(result, headers, COLUMNS.month);
       addResolvedField(result, headers, COLUMNS.day);
@@ -3464,12 +3649,6 @@
   }
 
   function validateHeaders(headers, dataset = getActiveDataset()) {
-    const headerSet = new Set(headers.map(normalizeText));
-    const hasTaxonHeader = headerSet.has(COLUMNS.taxon) || headerSet.has(LEGACY_TAXON_HEADER);
-    if (!hasTaxonHeader && headerSet.has(REJECTED_TAXON_HEADER)) {
-      throw new Error("ヘッダーが旧形式です。「Taxon」ではなく「分類群」に変更してから、再読み込みしてください。");
-    }
-
     const latitudeField = configuredLatitudeField(dataset, headers);
     const longitudeField = configuredLongitudeField(dataset, headers);
     if (!latitudeField || !longitudeField) {
@@ -3481,6 +3660,7 @@
     const filterHeaders = (headers || []).map(normalizeText).filter(Boolean);
     const latitudeField = configuredLatitudeField(dataset, headers);
     const longitudeField = configuredLongitudeField(dataset, headers);
+    const markerShapeField = configuredMarkerShapeField(dataset, headers);
     return rows.map((row, index) => {
       const latitude = parseNumber(row[`__raw_${latitudeField}`] ?? row[latitudeField]);
       const longitude = parseNumber(row[`__raw_${longitudeField}`] ?? row[longitudeField]);
@@ -3488,26 +3668,16 @@
       filterHeaders.forEach((header) => {
         values[header] = normalizeText(row[header]);
       });
-      if (!values[COLUMNS.taxon] && values[LEGACY_TAXON_HEADER]) {
-        values[COLUMNS.taxon] = values[LEGACY_TAXON_HEADER];
-      }
-      if (!values[COLUMNS.latitude] && values[LEGACY_LATITUDE_HEADER]) {
-        values[COLUMNS.latitude] = values[LEGACY_LATITUDE_HEADER];
-      }
-      if (!values[COLUMNS.longitude] && values[LEGACY_LONGITUDE_HEADER]) {
-        values[COLUMNS.longitude] = values[LEGACY_LONGITUDE_HEADER];
-      }
-      if (!values[COLUMNS.date] && values[LEGACY_DATE_HEADER]) {
-        values[COLUMNS.date] = values[LEGACY_DATE_HEADER];
-      }
 
       return {
         __values: values,
         __filterValues: values,
         __index: index,
         id: values[COLUMNS.id] || "",
-        taxon: values[COLUMNS.taxon] || values[LEGACY_TAXON_HEADER] || "",
+        taxon: values[COLUMNS.taxon] || "",
         recordType: values[COLUMNS.recordType] || "",
+        markerShapeValue: markerShapeField ? normalizeText(values[markerShapeField]) : "",
+        markerShape: markerShapeForValue(normalizeText(values[markerShapeField]), dataset),
         repository: values[COLUMNS.repository] || "",
         specimenId: values[COLUMNS.specimenId] || "",
         locality: values[COLUMNS.locality] || "",
@@ -3638,7 +3808,7 @@
 
   function markerKindForGroup(group) {
     const segment = bestMarkerSegment(group?.segments || getMarkerSegments(group?.records || []));
-    return segment?.kind || recordKind(group?.representative?.recordType) || "unknown";
+    return normalizeMarkerShapeId(segment?.kind || group?.representative?.markerShape || DEFAULT_MARKER_SHAPE);
   }
 
   function bestMarkerSegment(segments) {
@@ -3646,17 +3816,12 @@
   }
 
   function markerShapePriority(kind) {
-    if (kind === "type") return 3;
-    if (kind === "synonymType") return 2;
-    if (kind === "thisStudy" || kind === "literature") return 1;
-    return 0;
+    return MARKER_SHAPE_BY_ID.get(normalizeMarkerShapeId(kind))?.priority || 0;
   }
 
   function getMarkerSegmentPriority(segment) {
     if (!segment) return 0;
-    const shapePriority = markerShapePriority(segment.kind);
-    const fillPriority = segment.hollow ? 0 : 1;
-    return shapePriority * 10 + fillPriority;
+    return markerShapePriority(segment.kind);
   }
 
   function compareMarkerSegments(a, b) {
@@ -3730,13 +3895,10 @@
     if (!colorField) {
       const sortedRecords = [...records].sort(compareRecordsForRepresentative);
       const representative = sortedRecords[0];
-      const kind = recordKind(representative.recordType);
-      const hasThisStudy = records.some((record) => recordKind(record.recordType) === "thisStudy");
       return [{
         value: "",
         color: DEFAULT_MARKER_COLOR,
-        kind,
-        hollow: shouldUseHollowMarkerInterior(kind, hasThisStudy),
+        kind: normalizeMarkerShapeId(representative.markerShape),
         representative
       }];
     }
@@ -3754,23 +3916,14 @@
       .map(([value, valueRecords]) => {
         const sortedRecords = [...valueRecords].sort(compareRecordsForRepresentative);
         const representative = sortedRecords[0];
-        const kind = recordKind(representative.recordType);
-        const hasThisStudyForSameValue = valueRecords.some((record) => recordKind(record.recordType) === "thisStudy");
         return {
           value,
           color: colorForColorValue(value),
-          kind,
-          hollow: shouldUseHollowMarkerInterior(kind, hasThisStudyForSameValue),
+          kind: normalizeMarkerShapeId(representative.markerShape),
           representative
         };
       })
       .sort(compareMarkerSegments);
-  }
-
-  function shouldUseHollowMarkerInterior(kind, hasThisStudyForSameTaxon) {
-    if (kind === "literature") return true;
-    if (kind === "type" || kind === "synonymType") return !hasThisStudyForSameTaxon;
-    return false;
   }
 
   function markerSvg(kind, segmentsOrColor) {
@@ -3801,86 +3954,69 @@
     }).filter((item) => item.color);
   }
 
-  function singleColorMarkerSvg(kind, color, hollow = false) {
+  function singleColorMarkerSvg(kind, color) {
+    const shape = normalizeMarkerShapeId(kind);
     const stroke = "rgba(0,0,0,0.72)";
     const white = "rgba(255,255,255,0.94)";
     const innerStroke = "rgba(0,0,0,0.18)";
+    const starPoints = "12,1.6 14.8,8.4 22.1,8.9 16.5,13.6 18.2,20.8 12,17 5.8,20.8 7.5,13.6 1.9,8.9 9.2,8.4";
+    const diamondPoints = "12,2.8 21.2,12 12,21.2 2.8,12";
+    const triangleUpPoints = "12,3.8 21,19.2 3,19.2";
+    const triangleDownPoints = "3,4.8 21,4.8 12,20.2";
 
-    if (kind === "type") {
-      const starPoints = "12,1.6 14.8,8.4 22.1,8.9 16.5,13.6 18.2,20.8 12,17 5.8,20.8 7.5,13.6 1.9,8.9 9.2,8.4";
-      const innerStarTransform = "translate(12 12) scale(0.50) translate(-12 -12)";
-      if (hollow) {
-        return `
-          <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
-            <polygon points="${starPoints}" fill="${color}" stroke="${stroke}" stroke-width="1.4" />
-            <polygon points="${starPoints}" transform="${innerStarTransform}"
-              fill="${white}" stroke="${innerStroke}" stroke-width="0.45" />
-          </svg>`;
-      }
+    if (shape === "star-filled" || shape === "star-hollow") {
       return `
         <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
-          <polygon points="${starPoints}"
-            fill="${color}" stroke="${stroke}" stroke-width="1.4" />
+          <polygon points="${starPoints}" fill="${color}" stroke="${stroke}" stroke-width="1.4" />
+          ${shape.endsWith("-hollow") ? `<polygon points="${starPoints}" transform="translate(12 12) scale(0.52) translate(-12 -12)" fill="${white}" stroke="${innerStroke}" stroke-width="0.45" />` : ""}
         </svg>`;
     }
 
-    if (kind === "synonymType") {
-      if (hollow) {
-        return `
-          <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
-            <rect x="5" y="5" width="14" height="14" rx="1.8"
-              fill="${color}" stroke="${stroke}" stroke-width="1.7" />
-            <rect x="8.3" y="8.3" width="7.4" height="7.4" rx="1.0"
-              fill="${white}" stroke="${innerStroke}" stroke-width="0.45" />
-          </svg>`;
-      }
+    if (shape === "square-filled" || shape === "square-hollow") {
       return `
         <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
-          <rect x="5" y="5" width="14" height="14" rx="1.8"
-            fill="${color}" stroke="${stroke}" stroke-width="1.7" />
+          <rect x="5" y="5" width="14" height="14" rx="1.8" fill="${color}" stroke="${stroke}" stroke-width="1.7" />
+          ${shape.endsWith("-hollow") ? `<rect x="8.4" y="8.4" width="7.2" height="7.2" rx="1.0" fill="${white}" stroke="${innerStroke}" stroke-width="0.45" />` : ""}
         </svg>`;
     }
 
-    if (kind === "literature") {
+    if (shape === "diamond-filled" || shape === "diamond-hollow") {
       return `
         <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
-          <circle cx="12" cy="12" r="8.2"
-            fill="${color}" stroke="${stroke}" stroke-width="1.7" />
-          <circle cx="12" cy="12" r="4.5"
-            fill="${white}" stroke="${innerStroke}" stroke-width="0.45" />
+          <polygon points="${diamondPoints}" fill="${color}" stroke="${stroke}" stroke-width="1.7" stroke-linejoin="round" />
+          ${shape.endsWith("-hollow") ? `<polygon points="${diamondPoints}" transform="translate(12 12) scale(0.52) translate(-12 -12)" fill="${white}" stroke="${innerStroke}" stroke-width="0.45" stroke-linejoin="round" />` : ""}
         </svg>`;
     }
 
-    if (kind === "uncertain") {
+    if (shape === "circle-filled" || shape === "circle-hollow" || shape === "double-circle") {
       return `
         <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
-          <line x1="5.2" y1="5.2" x2="18.8" y2="18.8"
-            stroke="${stroke}" stroke-width="6.0" stroke-linecap="round" />
-          <line x1="18.8" y1="5.2" x2="5.2" y2="18.8"
-            stroke="${stroke}" stroke-width="6.0" stroke-linecap="round" />
-          <line x1="5.2" y1="5.2" x2="18.8" y2="18.8"
-            stroke="${color}" stroke-width="4.1" stroke-linecap="round" />
-          <line x1="18.8" y1="5.2" x2="5.2" y2="18.8"
-            stroke="${color}" stroke-width="4.1" stroke-linecap="round" />
+          <circle cx="12" cy="12" r="8.2" fill="${shape === "double-circle" ? white : color}" stroke="${shape === "double-circle" ? color : stroke}" stroke-width="1.7" />
+          ${shape === "circle-hollow" ? `<circle cx="12" cy="12" r="4.5" fill="${white}" stroke="${innerStroke}" stroke-width="0.45" />` : ""}
+          ${shape === "double-circle" ? `<circle cx="12" cy="12" r="4.5" fill="none" stroke="${color}" stroke-width="2.0" />` : ""}
         </svg>`;
     }
 
-    if (kind === "unknown") {
+    if (shape === "triangle-up-filled" || shape === "triangle-up-hollow" || shape === "triangle-down-filled" || shape === "triangle-down-hollow") {
+      const points = shape.includes("down") ? triangleDownPoints : triangleUpPoints;
       return `
         <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
-          <polygon points="12,3.8 21,19.2 3,19.2"
-            fill="${color}" stroke="${stroke}" stroke-width="1.7" stroke-linejoin="round" />
+          <polygon points="${points}" fill="${color}" stroke="${stroke}" stroke-width="1.7" stroke-linejoin="round" />
+          ${shape.endsWith("-hollow") ? `<polygon points="${points}" transform="translate(12 12) scale(0.52) translate(-12 -12)" fill="${white}" stroke="${innerStroke}" stroke-width="0.45" stroke-linejoin="round" />` : ""}
         </svg>`;
     }
 
     return `
       <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
-        <circle cx="12" cy="12" r="8.2"
-          fill="${color}" stroke="${stroke}" stroke-width="1.7" />
+        <line x1="5.2" y1="5.2" x2="18.8" y2="18.8" stroke="${stroke}" stroke-width="6.0" stroke-linecap="round" />
+        <line x1="18.8" y1="5.2" x2="5.2" y2="18.8" stroke="${stroke}" stroke-width="6.0" stroke-linecap="round" />
+        <line x1="5.2" y1="5.2" x2="18.8" y2="18.8" stroke="${color}" stroke-width="4.1" stroke-linecap="round" />
+        <line x1="18.8" y1="5.2" x2="5.2" y2="18.8" stroke="${color}" stroke-width="4.1" stroke-linecap="round" />
       </svg>`;
   }
 
   function splitColorMarkerSvg(kind, segments) {
+    const shape = normalizeMarkerShapeId(kind);
     const clipId = `markerClip_${Math.random().toString(36).slice(2)}`;
     const innerClipId = `markerInnerClip_${Math.random().toString(36).slice(2)}`;
     const stroke = "rgba(0,0,0,0.82)";
@@ -3889,7 +4025,7 @@
     const slices = radialColorSlices(segmentList, clipId);
     const hollowSlices = radialHollowSlices(segmentList, innerClipId, innerWhite);
 
-    if (kind === "type") {
+    if (shape === "star-filled" || shape === "star-hollow") {
       const starPoints = "12,1.6 14.8,8.4 22.1,8.9 16.5,13.6 18.2,20.8 12,17 5.8,20.8 7.5,13.6 1.9,8.9 9.2,8.4";
       const innerStarTransform = "translate(12 12) scale(0.50) translate(-12 -12)";
       return `
@@ -3899,12 +4035,12 @@
             <clipPath id="${innerClipId}"><polygon points="${starPoints}" transform="${innerStarTransform}" /></clipPath>
           </defs>
           ${slices}
-          ${hollowSlices}
+          ${shape === "star-hollow" ? `<polygon points="${starPoints}" transform="${innerStarTransform}" fill="${innerWhite}" stroke="rgba(0,0,0,0.22)" stroke-width="0.45" />` : hollowSlices}
           <polygon points="${starPoints}" fill="none" stroke="${stroke}" stroke-width="1.8" />
         </svg>`;
     }
 
-    if (kind === "synonymType") {
+    if (shape === "square-filled" || shape === "square-hollow") {
       return `
         <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
           <defs>
@@ -3912,12 +4048,25 @@
             <clipPath id="${innerClipId}"><rect x="8.3" y="8.3" width="7.4" height="7.4" rx="1.0" /></clipPath>
           </defs>
           ${slices}
-          ${hollowSlices}
+          ${shape === "square-hollow" ? `<rect x="8.3" y="8.3" width="7.4" height="7.4" rx="1.0" fill="${innerWhite}" stroke="rgba(0,0,0,0.22)" stroke-width="0.45" />` : hollowSlices}
           <rect x="5" y="5" width="14" height="14" rx="1.8" fill="none" stroke="${stroke}" stroke-width="1.9" />
         </svg>`;
     }
 
-    if (kind === "literature") {
+    if (shape === "diamond-filled" || shape === "diamond-hollow") {
+      const diamondPoints = "12,2.8 21.2,12 12,21.2 2.8,12";
+      return `
+        <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+          <defs>
+            <clipPath id="${clipId}"><polygon points="${diamondPoints}" /></clipPath>
+          </defs>
+          ${slices}
+          ${shape === "diamond-hollow" ? `<polygon points="${diamondPoints}" transform="translate(12 12) scale(0.50) translate(-12 -12)" fill="${innerWhite}" stroke="rgba(0,0,0,0.22)" stroke-width="0.45" stroke-linejoin="round" />` : ""}
+          <polygon points="${diamondPoints}" fill="none" stroke="${stroke}" stroke-width="1.9" stroke-linejoin="round" />
+        </svg>`;
+    }
+
+    if (shape === "circle-filled" || shape === "circle-hollow" || shape === "double-circle") {
       return `
         <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
           <defs>
@@ -3925,13 +4074,13 @@
             <clipPath id="${innerClipId}"><circle cx="12" cy="12" r="4.5" /></clipPath>
           </defs>
           ${slices}
-          ${radialHollowSlices(segmentList.map((segment) => ({ ...segment, kind: "literature" })), innerClipId, innerWhite)}
-          <circle cx="12" cy="12" r="4.5" fill="none" stroke="${stroke}" stroke-width="0.45" />
-          <circle cx="12" cy="12" r="8.2" fill="none" stroke="${stroke}" stroke-width="1.9" />
+          ${shape === "circle-hollow" ? `<circle cx="12" cy="12" r="4.5" fill="${innerWhite}" stroke="rgba(0,0,0,0.22)" stroke-width="0.45" />` : hollowSlices}
+          ${shape === "double-circle" ? `<circle cx="12" cy="12" r="4.5" fill="none" stroke="${representativeSegmentColor(segmentList)}" stroke-width="1.6" />` : ""}
+          <circle cx="12" cy="12" r="8.2" fill="none" stroke="${shape === "double-circle" ? representativeSegmentColor(segmentList) : stroke}" stroke-width="1.9" />
         </svg>`;
     }
 
-    if (kind === "uncertain") {
+    if (shape === "x") {
       return `
         <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
           <defs>
@@ -3946,14 +4095,16 @@
         </svg>`;
     }
 
-    if (kind === "unknown") {
+    if (shape === "triangle-up-filled" || shape === "triangle-up-hollow" || shape === "triangle-down-filled" || shape === "triangle-down-hollow") {
+      const points = shape.includes("down") ? "3,4.8 21,4.8 12,20.2" : "12,3.8 21,19.2 3,19.2";
       return `
         <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
           <defs>
-            <clipPath id="${clipId}"><polygon points="12,3.8 21,19.2 3,19.2" /></clipPath>
+            <clipPath id="${clipId}"><polygon points="${points}" /></clipPath>
           </defs>
           ${slices}
-          <polygon points="12,3.8 21,19.2 3,19.2" fill="none" stroke="${stroke}" stroke-width="1.9" stroke-linejoin="round" />
+          ${shape.endsWith("-hollow") ? `<polygon points="${points}" transform="translate(12 12) scale(0.50) translate(-12 -12)" fill="${innerWhite}" stroke="rgba(0,0,0,0.22)" stroke-width="0.45" stroke-linejoin="round" />` : ""}
+          <polygon points="${points}" fill="none" stroke="${stroke}" stroke-width="1.9" stroke-linejoin="round" />
         </svg>`;
     }
 
@@ -3973,6 +4124,10 @@
   function isHollowMarkerSegment(segment) {
     if (segment && typeof segment === "object") return Boolean(segment.hollow);
     return segment === "literature";
+  }
+
+  function representativeSegmentColor(segments) {
+    return normalizeMarkerSegments(segments)[0]?.color || DEFAULT_MARKER_COLOR;
   }
 
   function radialColorSlices(segments, clipId) {
@@ -4039,15 +4194,11 @@
   }
 
   function popupMarkerSvg(record) {
-    const kind = recordKind(record?.recordType);
+    const kind = normalizeMarkerShapeId(record?.markerShape);
     const color = activeColorField() ? colorForRecord(record) : DEFAULT_MARKER_COLOR;
-    const relatedRecords = recordsForPopupMarker(record);
-    const hasThisStudyForSameColorValue = relatedRecords.some((candidate) => recordKind(candidate.recordType) === "thisStudy");
-    const hollow = shouldUseHollowMarkerInterior(kind, hasThisStudyForSameColorValue);
     return markerSvg(kind, [{
       color,
       kind,
-      hollow,
       representative: record
     }]);
   }
@@ -4304,27 +4455,36 @@
   function renderRecordTypeLegend(records) {
     if (!recordTypeLegendEl) return;
 
-    const visibleKinds = new Set(records.map((record) => recordKind(record.recordType)));
-    const items = RECORD_TYPE_LEGEND_ITEMS.filter((item) => visibleKinds.has(item.kind));
+    const shapeField = activeMarkerShapeField();
+    const shapeMap = configuredMarkerShapeMap(getActiveDataset());
+    if (recordTypeLegendEl.previousElementSibling) {
+      recordTypeLegendEl.previousElementSibling.textContent = shapeField ? `形状：${fieldLabel(shapeField)}` : "マーカー形状";
+    }
+    const values = [...new Set(records.map((record) => record.markerShapeValue || ""))].filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, "ja"));
 
-    if (!items.length) {
+    if (!records.length) {
       recordTypeLegendEl.innerHTML = '<div class="legend-row legend-empty">表示中の記録はありません</div>';
       return;
     }
 
-    recordTypeLegendEl.innerHTML = items.map((item) => `
-      <div class="legend-row">
-        <span class="legend-symbol ${legendSymbolClassForKind(item.kind)}"></span>${escapeHTML(item.label)}
-      </div>`).join("");
-  }
+    if (!shapeField || !values.length) {
+      recordTypeLegendEl.innerHTML = `
+        <div class="legend-row">
+          ${markerSvg(DEFAULT_MARKER_SHAPE, [{ color: DEFAULT_MARKER_COLOR, kind: DEFAULT_MARKER_SHAPE }])}
+          <span>すべて ${markerShapeLabel(DEFAULT_MARKER_SHAPE)}</span>
+        </div>`;
+      return;
+    }
 
-  function legendSymbolClassForKind(kind) {
-    if (kind === "type") return "star";
-    if (kind === "synonymType") return "square";
-    if (kind === "literature") return "hollow";
-    if (kind === "thisStudy") return "filled";
-    if (kind === "uncertain") return "x";
-    return "triangle unknown";
+    recordTypeLegendEl.innerHTML = values.map((value) => {
+      const shape = normalizeMarkerShapeId(shapeMap[value] || DEFAULT_MARKER_SHAPE);
+      return `
+      <div class="legend-row">
+        ${markerSvg(shape, [{ color: DEFAULT_MARKER_COLOR, kind: shape }])}
+        <span>${escapeHTML(value)}</span>
+      </div>`;
+    }).join("");
   }
 
   function renderTaxonLegend(records) {
@@ -4350,7 +4510,7 @@
 
     taxonLegendEl.innerHTML = values.map((value) => {
       const label = colorValueLabel(value);
-      const labelHtml = colorField === COLUMNS.taxon || colorField === LEGACY_TAXON_HEADER
+      const labelHtml = colorField === COLUMNS.taxon
         ? formatTaxonHTML(label)
         : escapeHTML(label);
       return `
@@ -4383,6 +4543,7 @@
   }
 
   if (datasetLoadFieldsButton) datasetLoadFieldsButton.addEventListener("click", loadDatasetFieldsForModal);
+  if (datasetMarkerShapeFieldSelect) datasetMarkerShapeFieldSelect.addEventListener("change", loadMarkerShapeValuesForModal);
   if (datasetModalCloseButton) datasetModalCloseButton.addEventListener("click", () => closeDatasetModal(null));
   if (datasetModalCancelButton) datasetModalCancelButton.addEventListener("click", () => closeDatasetModal(null));
   if (datasetModal) {

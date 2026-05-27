@@ -159,6 +159,13 @@ body,
   line-height: 1.3;
 }
 
+.legend-row svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.8));
+}
+
 .legend-symbol,
 .taxon-chip {
   display: inline-block;
@@ -257,26 +264,41 @@ body,
   clip-path: circle(40% at 50% 50%);
 }
 
-.record-marker.kind-type {
+.record-marker.kind-star-filled,
+.record-marker.kind-star-hollow {
   width: 32px;
   height: 32px;
   -webkit-clip-path: polygon(50% 6.7%, 61.7% 35%, 92.1% 37.1%, 68.8% 56.7%, 75.8% 86.7%, 50% 70.8%, 24.2% 86.7%, 31.3% 56.7%, 7.9% 37.1%, 38.3% 35%);
   clip-path: polygon(50% 6.7%, 61.7% 35%, 92.1% 37.1%, 68.8% 56.7%, 75.8% 86.7%, 50% 70.8%, 24.2% 86.7%, 31.3% 56.7%, 7.9% 37.1%, 38.3% 35%);
 }
 
-.record-marker.kind-synonymType {
+.record-marker.kind-square-filled,
+.record-marker.kind-square-hollow {
   -webkit-clip-path: inset(17% 17% 17% 17% round 2px);
   clip-path: inset(17% 17% 17% 17% round 2px);
 }
 
-.record-marker.kind-uncertain {
+.record-marker.kind-diamond-filled,
+.record-marker.kind-diamond-hollow {
+  -webkit-clip-path: polygon(50% 10%, 90% 50%, 50% 90%, 10% 50%);
+  clip-path: polygon(50% 10%, 90% 50%, 50% 90%, 10% 50%);
+}
+
+.record-marker.kind-x {
   -webkit-clip-path: polygon(18% 6%, 50% 38%, 82% 6%, 94% 18%, 62% 50%, 94% 82%, 82% 94%, 50% 62%, 18% 94%, 6% 82%, 38% 50%, 6% 18%);
   clip-path: polygon(18% 6%, 50% 38%, 82% 6%, 94% 18%, 62% 50%, 94% 82%, 82% 94%, 50% 62%, 18% 94%, 6% 82%, 38% 50%, 6% 18%);
 }
 
-.record-marker.kind-unknown {
+.record-marker.kind-triangle-up-filled,
+.record-marker.kind-triangle-up-hollow {
   -webkit-clip-path: polygon(50% 15%, 87% 82%, 13% 82%);
   clip-path: polygon(50% 15%, 87% 82%, 13% 82%);
+}
+
+.record-marker.kind-triangle-down-filled,
+.record-marker.kind-triangle-down-hollow {
+  -webkit-clip-path: polygon(13% 18%, 87% 18%, 50% 85%);
+  clip-path: polygon(13% 18%, 87% 18%, 50% 85%);
 }
 
 .maplibregl-marker.record-marker {
@@ -302,25 +324,32 @@ body,
 
 
 
-.field-map-focus-control button {
+.field-map-focus-control .field-map-focus-button {
   width: 29px;
   height: 29px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1;
 }
 
-.field-map-focus-control button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.field-map-focus-control .field-map-focus-button:disabled {
+  color: #9aa4ad;
+  cursor: default;
 }
 
-.field-map-focus-control button:active:not(:disabled) {
+.field-map-focus-control .field-map-focus-button:disabled .field-map-focus-icon {
+  opacity: 0.68;
+}
+
+.field-map-focus-control .field-map-focus-button:active:not(:disabled) {
   transform: translateY(1px);
+}
+
+.field-map-focus-icon {
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
 }
 
 .maplibregl-popup {
@@ -897,6 +926,60 @@ body.modal-open {
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
+}
+
+.dataset-shape-map {
+  display: grid;
+  gap: 6px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.dataset-shape-map-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px minmax(150px, 200px);
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.dataset-shape-map-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #333;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.dataset-shape-map-preview {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dataset-shape-map-preview svg {
+  width: 24px;
+  height: 24px;
+  display: block;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.8));
+}
+
+.dataset-shape-map-row select {
+  width: 100%;
+  min-width: 0;
+}
+
+.dataset-shape-map-empty {
+  margin: 0;
+  color: #666;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .modal-error {
@@ -2561,7 +2644,9 @@ body.modal-open {
 #dataset-edit-button,
 #dataset-delete-button,
 #dataset-share-button,
-#dataset-register-button {
+#dataset-register-button,
+#reload-button,
+#reload-cancel-button {
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
@@ -2622,7 +2707,7 @@ body.modal-open {
 
 .map-row {
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) minmax(64px, auto) !important;
+  grid-template-columns: minmax(0, 1fr) !important;
   align-items: center !important;
   gap: 6px !important;
   width: 100% !important;
@@ -2655,7 +2740,8 @@ body.modal-open {
   text-overflow: ellipsis;
 }
 
-#reload-button {
+#reload-button,
+#reload-cancel-button {
   width: auto !important;
   min-width: 64px !important;
   max-width: 100% !important;
@@ -2674,7 +2760,8 @@ body.modal-open {
     grid-template-columns: auto minmax(0, 1fr) !important;
   }
 
-  #reload-button {
+  #reload-button,
+  #reload-cancel-button {
     width: 100% !important;
   }
 }
