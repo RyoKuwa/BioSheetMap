@@ -12,9 +12,43 @@
   const REJECTED_TAXON_HEADER = "Taxon";
   const VIRTUAL_COORDINATES_FIELD = "__coordinates";
   const DEFAULT_MARKER_COLOR = "#666666";
+  const OTHER_MARKER_COLOR = "#9E9E9E";
+  const COLOR_BY_UNKNOWN_KEY = "__field_map_color_unknown__";
+  const MARKER_COLOR_MAX_SEGMENTS = 6;
   const POPUP_NEARBY_MARKER_PIXELS = Number(CONFIG.POPUP_NEARBY_MARKER_PIXELS) || Number(CONFIG.PROXIMITY_PIXELS) || 10;
   const LOAD_TIMEOUT_MS = Number(CONFIG.LOAD_TIMEOUT_MS) || 30000;
   const LOAD_SLOW_NOTICE_MS = Number(CONFIG.LOAD_SLOW_NOTICE_MS) || 10000;
+  const MARKER_COLOR_ASSIGNMENT_CONFIG = {
+    optimizedMaxCategories: 30,
+    greedyMaxCategories: 80,
+    sameMarkerWeight: 100,
+    visualAdjacencyWeight: 35,
+    geographicSeparationWeight: 65,
+    nearWeight: 10,
+    gridWeight: 3,
+    visualAdjacencyCandidatePoolSize: 24,
+    visualAdjacencyCandidateCount: 4,
+    visualAdjacencySkipMinCategories: 80,
+    visualAdjacencySkipMixedMarkerRatio: 0.65,
+    visualAdjacencySkipAverageVisibleCategories: 2.75,
+    visualAdjacencyMaxDistancePixels: 180,
+    visualAdjacencyFallbackDistanceMeters: 15000,
+    visualAdjacencyInterveningTolerance: 0.9,
+    geographicSeparationCandidateCount: 10,
+    geographicSeparationMaxDistanceMeters: 350000,
+    geographicSeparationMaxCategories: 300,
+    nearDistanceMeters: 3000,
+    gridCellMeters: 20000,
+    minSameMarkerDistance: 0.1,
+    minVisualAdjacencyDistance: 0.085,
+    minGeographicSeparationDistance: 0.075,
+    minGlobalColorDistance: 0.13,
+    colorReusePenalty: 0.05,
+    globalColorSeparationWeight: 18,
+    hashDeviationPenalty: 0.01,
+    hardPenalty: 10000,
+    maxImprovePasses: 3
+  };
 
   const FILTER_FIELD_LABEL_OVERRIDES = {
     [COLUMNS.taxon]: "分類群",
@@ -1688,6 +1722,689 @@
     return hash >>> 0;
   }
 
+  function clamp01(value) {
+    return Math.max(0, Math.min(1, Number(value) || 0));
+  }
+
+  function positiveMod(value, length) {
+    if (!length) return 0;
+    return ((value % length) + length) % length;
+  }
+
+  function rangeValues(start, end, step) {
+    const values = [];
+    for (let value = start; value < end; value += step) {
+      values.push(value);
+    }
+    return values;
+  }
+
+  function naturalCompareValues(a, b) {
+    return String(a).localeCompare(String(b), "ja", { numeric: true, sensitivity: "base" });
+  }
+
+  function orderColorPair(a, b) {
+    const left = String(a);
+    const right = String(b);
+    return left <= right ? [left, right] : [right, left];
+  }
+
+  function circularIndexDistance(a, b, length) {
+    const distance = Math.abs(a - b);
+    return Math.min(distance, length - distance);
+  }
+
+  function oklchToOklab(lightness, chroma, hueDegrees) {
+    const hueRadians = (hueDegrees * Math.PI) / 180;
+    return {
+      L: lightness,
+      a: chroma * Math.cos(hueRadians),
+      b: chroma * Math.sin(hueRadians)
+    };
+  }
+
+  function oklabDistance(a, b) {
+    return Math.hypot(a.L - b.L, a.a - b.a, a.b - b.b);
+  }
+
+  function linearToSrgb(value) {
+    if (value <= 0.0031308) return 12.92 * value;
+    return 1.055 * Math.pow(value, 1 / 2.4) - 0.055;
+  }
+
+  function srgbToLinear(value) {
+    if (value <= 0.04045) return value / 12.92;
+    return Math.pow((value + 0.055) / 1.055, 2.4);
+  }
+
+  function srgbToOklab(r, g, b) {
+    const linearR = srgbToLinear(clamp01(r));
+    const linearG = srgbToLinear(clamp01(g));
+    const linearB = srgbToLinear(clamp01(b));
+    const l = 0.4122214708 * linearR + 0.5363325363 * linearG + 0.0514459929 * linearB;
+    const m = 0.2119034982 * linearR + 0.6806995451 * linearG + 0.1073969566 * linearB;
+    const s = 0.0883024619 * linearR + 0.2817188376 * linearG + 0.6299787005 * linearB;
+    const lRoot = Math.cbrt(l);
+    const mRoot = Math.cbrt(m);
+    const sRoot = Math.cbrt(s);
+    return {
+      L: 0.2104542553 * lRoot + 0.793617785 * mRoot - 0.0040720468 * sRoot,
+      a: 1.9779984951 * lRoot - 2.428592205 * mRoot + 0.4505937099 * sRoot,
+      b: 0.0259040371 * lRoot + 0.7827717662 * mRoot - 0.808675766 * sRoot
+    };
+  }
+
+  function oklabToSrgb(lightness, a, b) {
+    const l_ = lightness + 0.3963377774 * a + 0.2158037573 * b;
+    const m_ = lightness - 0.1055613458 * a - 0.0638541728 * b;
+    const s_ = lightness - 0.0894841775 * a - 1.291485548 * b;
+    const l = l_ * l_ * l_;
+    const m = m_ * m_ * m_;
+    const s = s_ * s_ * s_;
+    return {
+      r: linearToSrgb(clamp01(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s)),
+      g: linearToSrgb(clamp01(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s)),
+      b: linearToSrgb(clamp01(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s))
+    };
+  }
+
+  function rgbToHex(r, g, b) {
+    const to255 = (value) => Math.max(0, Math.min(255, Math.round(value * 255)));
+    return `#${to255(r).toString(16).padStart(2, "0")}${to255(g).toString(16).padStart(2, "0")}${to255(b).toString(16).padStart(2, "0")}`;
+  }
+
+  function makeMarkerPaletteColor(lightness, chroma, hueDegrees) {
+    const lab = oklchToOklab(lightness, chroma, hueDegrees);
+    const rgb = oklabToSrgb(lab.L, lab.a, lab.b);
+    return {
+      css: rgbToHex(rgb.r, rgb.g, rgb.b),
+      lab: srgbToOklab(rgb.r, rgb.g, rgb.b)
+    };
+  }
+
+  function generateMarkerColorPalette() {
+    const primaryHues = [210, 25, 145, 285, 50, 185, 325, 95, 250, 5, 165, 305];
+    const secondaryHues = rangeValues(0, 360, 30).map((hue) => (hue + 15) % 360);
+    const tertiaryHues = rangeValues(0, 360, 15).map((hue) => (hue + 7.5) % 360);
+    const palette = [];
+    const seenKeys = new Set();
+    const seenCss = new Set();
+    const addHue = (lightness, chroma, hue) => {
+      const key = `${lightness}|${chroma}|${Math.round(hue * 10)}`;
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+      const color = makeMarkerPaletteColor(lightness, chroma, hue % 360);
+      if (seenCss.has(color.css)) return;
+      seenCss.add(color.css);
+      palette.push(color);
+    };
+    primaryHues.forEach((hue) => addHue(0.72, 0.16, hue));
+    secondaryHues.forEach((hue) => addHue(0.64, 0.14, hue));
+    tertiaryHues.forEach((hue) => addHue(0.8, 0.11, hue));
+    return palette;
+  }
+
+  function projectMetersEquirectangular(latitude, longitude, meanLatitude) {
+    const earthRadius = 6371008.8;
+    const radians = Math.PI / 180;
+    return {
+      x: earthRadius * longitude * radians * Math.cos(meanLatitude * radians),
+      y: earthRadius * latitude * radians
+    };
+  }
+
+  function buildColorAssignmentRows(records = []) {
+    const proximityPixels = Number(CONFIG.PROXIMITY_PIXELS) || 10;
+    const sorted = [...records].sort(compareRecordsForRepresentative);
+    const groups = [];
+    sorted.forEach((record) => {
+      let point = null;
+      if (state.map) {
+        try {
+          point = state.map.project([record.longitude, record.latitude]);
+        } catch (error) {
+          point = null;
+        }
+      }
+      const visualX = Number(point?.x ?? point?.[0]);
+      const visualY = Number(point?.y ?? point?.[1]);
+      const coordinateKey = Number.isFinite(record.latitude) && Number.isFinite(record.longitude)
+        ? `${record.latitude.toFixed(6)}|${record.longitude.toFixed(6)}`
+        : `row:${record.__index ?? groups.length}`;
+      let matchedGroup = null;
+      if (Number.isFinite(visualX) && Number.isFinite(visualY)) {
+        for (const group of groups) {
+          if (!Number.isFinite(group.visualX) || !Number.isFinite(group.visualY)) continue;
+          const distance = Math.hypot(visualX - group.visualX, visualY - group.visualY);
+          if (distance <= proximityPixels) {
+            matchedGroup = group;
+            break;
+          }
+        }
+      } else {
+        matchedGroup = groups.find((group) => group.coordinateKey === coordinateKey) || null;
+      }
+      if (!matchedGroup) {
+        matchedGroup = {
+          records: [],
+          representative: record,
+          latitude: record.latitude,
+          longitude: record.longitude,
+          coordinateKey,
+          visualX,
+          visualY
+        };
+        groups.push(matchedGroup);
+      }
+      matchedGroup.records.push(record);
+      matchedGroup.records.sort(compareRecordsForRepresentative);
+      matchedGroup.representative = matchedGroup.records[0];
+      matchedGroup.latitude = matchedGroup.representative.latitude;
+      matchedGroup.longitude = matchedGroup.representative.longitude;
+      if (state.map) {
+        try {
+          const representativePoint = state.map.project([matchedGroup.longitude, matchedGroup.latitude]);
+          matchedGroup.visualX = Number(representativePoint?.x ?? representativePoint?.[0]);
+          matchedGroup.visualY = Number(representativePoint?.y ?? representativePoint?.[1]);
+        } catch (error) {
+          matchedGroup.visualX = visualX;
+          matchedGroup.visualY = visualY;
+        }
+      }
+    });
+
+    const rows = [];
+    groups.forEach((group, groupIndex) => {
+      group.records.forEach((record, rowIndex) => {
+        rows.push({
+          record,
+          category: getRecordColorValue(record),
+          latitude: Number(group.latitude),
+          longitude: Number(group.longitude),
+          visualX: Number(group.visualX),
+          visualY: Number(group.visualY),
+          markerKey: `marker:${groupIndex}`,
+          rowIndex
+        });
+      });
+    });
+    return rows;
+  }
+
+  function addColorGraphEdge(graph, a, b, type, weight) {
+    if (!a || !b || a === b || !graph.has(a) || !graph.has(b)) return;
+    const edgeAB = graph.get(a).get(b) || { sameMarkerCount: 0, adjacentCount: 0, geographicCount: 0, nearCount: 0, gridCount: 0, weight: 0 };
+    const edgeBA = graph.get(b).get(a) || { sameMarkerCount: 0, adjacentCount: 0, geographicCount: 0, nearCount: 0, gridCount: 0, weight: 0 };
+    edgeAB[type] += 1;
+    edgeBA[type] += 1;
+    edgeAB.weight += weight;
+    edgeBA.weight += weight;
+    graph.get(a).set(b, edgeAB);
+    graph.get(b).set(a, edgeBA);
+  }
+
+  function buildMarkerCategoryPoints(colorRows = []) {
+    const seen = new Set();
+    const points = [];
+    colorRows.forEach((row) => {
+      if (!Number.isFinite(row.latitude) || !Number.isFinite(row.longitude)) return;
+      const key = `${row.markerKey}|||${row.category}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      points.push(row);
+    });
+    return points;
+  }
+
+  function buildVisibleMarkerCategoryPoints(colorRows = []) {
+    const markerCategories = new Map();
+    colorRows.forEach((row) => {
+      if (!Number.isFinite(row.latitude) || !Number.isFinite(row.longitude)) return;
+      if (!markerCategories.has(row.markerKey)) markerCategories.set(row.markerKey, new Map());
+      const categories = markerCategories.get(row.markerKey);
+      const item = categories.get(row.category) || { ...row, count: 0 };
+      item.count += 1;
+      categories.set(row.category, item);
+    });
+    const points = [];
+    markerCategories.forEach((categories) => {
+      const sorted = Array.from(categories.values()).sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return naturalCompareValues(a.category, b.category);
+      });
+      const visibleCount = sorted.length > MARKER_COLOR_MAX_SEGMENTS ? MARKER_COLOR_MAX_SEGMENTS - 1 : MARKER_COLOR_MAX_SEGMENTS;
+      sorted.slice(0, visibleCount).forEach((item) => points.push(item));
+    });
+    return points;
+  }
+
+  function getMarkerCategoryOverlapStats(colorRows = []) {
+    const markerCategories = new Map();
+    colorRows.forEach((row) => {
+      if (!Number.isFinite(row.latitude) || !Number.isFinite(row.longitude)) return;
+      if (!markerCategories.has(row.markerKey)) markerCategories.set(row.markerKey, new Set());
+      markerCategories.get(row.markerKey).add(row.category);
+    });
+    let mixedMarkerCount = 0;
+    let visibleCategoryCount = 0;
+    markerCategories.forEach((categories) => {
+      if (categories.size > 1) mixedMarkerCount += 1;
+      visibleCategoryCount += categories.size > MARKER_COLOR_MAX_SEGMENTS ? MARKER_COLOR_MAX_SEGMENTS - 1 : categories.size;
+    });
+    const markerCount = markerCategories.size;
+    return {
+      markerCount,
+      mixedMarkerRatio: markerCount > 0 ? mixedMarkerCount / markerCount : 0,
+      averageVisibleCategories: markerCount > 0 ? visibleCategoryCount / markerCount : 0
+    };
+  }
+
+  function shouldSkipVisualAdjacencyConflicts(categoryCount, overlapStats, cfg = MARKER_COLOR_ASSIGNMENT_CONFIG) {
+    if (categoryCount < cfg.visualAdjacencySkipMinCategories) return false;
+    return overlapStats.mixedMarkerRatio >= cfg.visualAdjacencySkipMixedMarkerRatio
+      || overlapStats.averageVisibleCategories >= cfg.visualAdjacencySkipAverageVisibleCategories;
+  }
+
+  function addSameMarkerConflicts(graph, colorRows = [], cfg = MARKER_COLOR_ASSIGNMENT_CONFIG) {
+    const markerCategories = new Map();
+    colorRows.forEach((row) => {
+      if (!markerCategories.has(row.markerKey)) markerCategories.set(row.markerKey, new Set());
+      markerCategories.get(row.markerKey).add(row.category);
+    });
+    markerCategories.forEach((categorySet) => {
+      const categories = Array.from(categorySet);
+      categories.forEach((category, index) => {
+        categories.slice(index + 1).forEach((otherCategory) => {
+          addColorGraphEdge(graph, category, otherCategory, "sameMarkerCount", cfg.sameMarkerWeight);
+        });
+      });
+    });
+  }
+
+  function buildVisualAdjacencyPoints(colorRows = [], cfg = MARKER_COLOR_ASSIGNMENT_CONFIG) {
+    const points = buildVisibleMarkerCategoryPoints(colorRows);
+    const hasScreenPoints = points.some((point) => Number.isFinite(point.visualX) && Number.isFinite(point.visualY));
+    if (hasScreenPoints) {
+      return {
+        points: points
+          .filter((point) => Number.isFinite(point.visualX) && Number.isFinite(point.visualY))
+          .map((point, index) => ({ ...point, visualId: `${point.markerKey}|||${point.category}|||${index}`, x: point.visualX, y: point.visualY })),
+        maxDistance: cfg.visualAdjacencyMaxDistancePixels
+      };
+    }
+    const valid = points.filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude));
+    if (!valid.length) return { points: [], maxDistance: cfg.visualAdjacencyFallbackDistanceMeters };
+    const meanLatitude = valid.reduce((sum, point) => sum + point.latitude, 0) / valid.length;
+    return {
+      points: valid.map((point, index) => {
+        const projected = projectMetersEquirectangular(point.latitude, point.longitude, meanLatitude);
+        return { ...point, visualId: `${point.markerKey}|||${point.category}|||${index}`, x: projected.x, y: projected.y };
+      }),
+      maxDistance: cfg.visualAdjacencyFallbackDistanceMeters
+    };
+  }
+
+  function hasInterveningVisualPoint(point, otherPoint, nearbyPoints = [], distance, cfg = MARKER_COLOR_ASSIGNMENT_CONFIG) {
+    if (!Number.isFinite(distance) || distance <= 0) return false;
+    const threshold = distance * cfg.visualAdjacencyInterveningTolerance;
+    return nearbyPoints.some((candidate) => {
+      if (candidate.visualId === point.visualId || candidate.visualId === otherPoint.visualId || candidate.category === point.category || candidate.category === otherPoint.category) return false;
+      const distanceFromPoint = Math.hypot(point.x - candidate.x, point.y - candidate.y);
+      const distanceFromOther = Math.hypot(otherPoint.x - candidate.x, otherPoint.y - candidate.y);
+      return Math.max(distanceFromPoint, distanceFromOther) < threshold;
+    });
+  }
+
+  function addVisualAdjacencyConflicts(graph, colorRows = [], cfg = MARKER_COLOR_ASSIGNMENT_CONFIG) {
+    const overlapStats = getMarkerCategoryOverlapStats(colorRows);
+    if (shouldSkipVisualAdjacencyConflicts(graph.size, overlapStats, cfg)) return;
+    const { points, maxDistance } = buildVisualAdjacencyPoints(colorRows, cfg);
+    if (!points.length || !Number.isFinite(maxDistance) || maxDistance <= 0) return;
+    const buckets = new Map();
+    points.forEach((point) => {
+      const cellX = Math.floor(point.x / maxDistance);
+      const cellY = Math.floor(point.y / maxDistance);
+      const key = `${cellX}|${cellY}`;
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push({ ...point, cellX, cellY });
+    });
+    const offsets = [-1, 0, 1];
+    const seenPairs = new Set();
+    buckets.forEach((bucket) => {
+      bucket.forEach((point) => {
+        const candidates = [];
+        offsets.forEach((offsetX) => {
+          offsets.forEach((offsetY) => {
+            const neighborBucket = buckets.get(`${point.cellX + offsetX}|${point.cellY + offsetY}`);
+            if (!neighborBucket) return;
+            neighborBucket.forEach((otherPoint) => {
+              if (point.visualId === otherPoint.visualId || point.markerKey === otherPoint.markerKey || point.category === otherPoint.category) return;
+              const distance = Math.hypot(point.x - otherPoint.x, point.y - otherPoint.y);
+              if (distance <= maxDistance) candidates.push({ point: otherPoint, distance });
+            });
+          });
+        });
+        const usedCategories = new Set();
+        const nearestCandidates = candidates
+          .sort((a, b) => a.distance - b.distance)
+          .slice(0, Math.max(cfg.visualAdjacencyCandidateCount, cfg.visualAdjacencyCandidatePoolSize));
+        const nearbyPoints = nearestCandidates.map((candidate) => candidate.point);
+        nearestCandidates.some((candidate) => {
+          const otherPoint = candidate.point;
+          if (usedCategories.has(otherPoint.category)) return false;
+          if (hasInterveningVisualPoint(point, otherPoint, nearbyPoints, candidate.distance, cfg)) return false;
+          const pairKey = orderColorPair(point.visualId, otherPoint.visualId).join("::::");
+          if (seenPairs.has(pairKey)) return false;
+          seenPairs.add(pairKey);
+          usedCategories.add(otherPoint.category);
+          const closeness = 1 - Math.min(1, candidate.distance / maxDistance);
+          addColorGraphEdge(graph, point.category, otherPoint.category, "adjacentCount", cfg.visualAdjacencyWeight * (0.45 + 0.55 * closeness));
+          return usedCategories.size >= cfg.visualAdjacencyCandidateCount;
+        });
+      });
+    });
+  }
+
+  function addNearConflicts(graph, colorRows = [], cfg = MARKER_COLOR_ASSIGNMENT_CONFIG) {
+    const points = buildMarkerCategoryPoints(colorRows);
+    if (!points.length) return;
+    const meanLatitude = points.reduce((sum, point) => sum + point.latitude, 0) / points.length;
+    const cellSize = Math.max(1, cfg.nearDistanceMeters);
+    const buckets = new Map();
+    points.forEach((point) => {
+      const projected = projectMetersEquirectangular(point.latitude, point.longitude, meanLatitude);
+      const cellX = Math.floor(projected.x / cellSize);
+      const cellY = Math.floor(projected.y / cellSize);
+      const key = `${cellX}|${cellY}`;
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push({ ...point, x: projected.x, y: projected.y, cellX, cellY });
+    });
+    const offsets = [-1, 0, 1];
+    const seenPairs = new Set();
+    buckets.forEach((bucket) => {
+      bucket.forEach((point) => {
+        offsets.forEach((offsetX) => {
+          offsets.forEach((offsetY) => {
+            const neighborBucket = buckets.get(`${point.cellX + offsetX}|${point.cellY + offsetY}`);
+            if (!neighborBucket) return;
+            neighborBucket.forEach((otherPoint) => {
+              if (point === otherPoint || point.markerKey === otherPoint.markerKey || point.category === otherPoint.category) return;
+              const recordPairKey = orderColorPair(`${point.markerKey}|||${point.category}`, `${otherPoint.markerKey}|||${otherPoint.category}`).join("::::");
+              if (seenPairs.has(recordPairKey)) return;
+              seenPairs.add(recordPairKey);
+              if (Math.hypot(point.x - otherPoint.x, point.y - otherPoint.y) <= cfg.nearDistanceMeters) {
+                addColorGraphEdge(graph, point.category, otherPoint.category, "nearCount", cfg.nearWeight);
+              }
+            });
+          });
+        });
+      });
+    });
+  }
+
+  function addGeographicSeparationConflicts(graph, colorRows = [], cfg = MARKER_COLOR_ASSIGNMENT_CONFIG) {
+    const points = buildMarkerCategoryPoints(colorRows).filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude));
+    const categories = Array.from(new Set(points.map((point) => point.category)));
+    if (!points.length || categories.length > cfg.geographicSeparationMaxCategories) return;
+    const meanLatitude = points.reduce((sum, point) => sum + point.latitude, 0) / points.length;
+    const categoryStats = new Map();
+    points.forEach((point) => {
+      const projected = projectMetersEquirectangular(point.latitude, point.longitude, meanLatitude);
+      const stats = categoryStats.get(point.category) || { category: point.category, count: 0, x: 0, y: 0 };
+      stats.count += 1;
+      stats.x += projected.x;
+      stats.y += projected.y;
+      categoryStats.set(point.category, stats);
+    });
+    const centroids = Array.from(categoryStats.values()).map((stats) => ({ category: stats.category, x: stats.x / stats.count, y: stats.y / stats.count }));
+    const seenPairs = new Set();
+    centroids.forEach((centroid) => {
+      centroids
+        .filter((other) => other.category !== centroid.category)
+        .map((other) => ({ other, distance: Math.hypot(centroid.x - other.x, centroid.y - other.y) }))
+        .filter((item) => item.distance <= cfg.geographicSeparationMaxDistanceMeters)
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, cfg.geographicSeparationCandidateCount)
+        .forEach(({ other, distance }) => {
+          const pairKey = orderColorPair(centroid.category, other.category).join("::::");
+          if (seenPairs.has(pairKey)) return;
+          seenPairs.add(pairKey);
+          const closeness = 1 - Math.min(1, distance / cfg.geographicSeparationMaxDistanceMeters);
+          addColorGraphEdge(graph, centroid.category, other.category, "geographicCount", cfg.geographicSeparationWeight * (0.25 + 0.75 * closeness));
+        });
+    });
+  }
+
+  function addGridConflicts(graph, colorRows = [], cfg = MARKER_COLOR_ASSIGNMENT_CONFIG) {
+    const points = buildMarkerCategoryPoints(colorRows);
+    if (!points.length) return;
+    const meanLatitude = points.reduce((sum, point) => sum + point.latitude, 0) / points.length;
+    const cellSize = Math.max(1, cfg.gridCellMeters);
+    const cellCategories = new Map();
+    points.forEach((point) => {
+      const projected = projectMetersEquirectangular(point.latitude, point.longitude, meanLatitude);
+      const key = `${Math.floor(projected.x / cellSize)}|${Math.floor(projected.y / cellSize)}`;
+      if (!cellCategories.has(key)) cellCategories.set(key, new Set());
+      cellCategories.get(key).add(point.category);
+    });
+    cellCategories.forEach((categorySet) => {
+      const categories = Array.from(categorySet).sort(naturalCompareValues);
+      categories.forEach((category, index) => {
+        categories.slice(index + 1).forEach((otherCategory) => {
+          addColorGraphEdge(graph, category, otherCategory, "gridCount", cfg.gridWeight);
+        });
+      });
+    });
+  }
+
+  function buildMarkerColorGraph(categories = [], colorRows = [], cfg = MARKER_COLOR_ASSIGNMENT_CONFIG) {
+    const graph = new Map();
+    categories.forEach((category) => graph.set(category, new Map()));
+    addSameMarkerConflicts(graph, colorRows, cfg);
+    addVisualAdjacencyConflicts(graph, colorRows, cfg);
+    addGeographicSeparationConflicts(graph, colorRows, cfg);
+    addNearConflicts(graph, colorRows, cfg);
+    addGridConflicts(graph, colorRows, cfg);
+    return graph;
+  }
+
+  function chooseMarkerColorMode(categoryCount, cfg = MARKER_COLOR_ASSIGNMENT_CONFIG) {
+    if (categoryCount <= cfg.optimizedMaxCategories) return "optimized";
+    if (categoryCount <= cfg.greedyMaxCategories) return "greedy";
+    return "fast";
+  }
+
+  function buildCandidateColorOrder(preferredIndex, length) {
+    const order = [preferredIndex];
+    for (let step = 1; step < length; step += 1) {
+      const next = positiveMod(preferredIndex + step, length);
+      const previous = positiveMod(preferredIndex - step, length);
+      if (!order.includes(next)) order.push(next);
+      if (!order.includes(previous)) order.push(previous);
+    }
+    return order;
+  }
+
+  function scoreMarkerColorChoice(category, candidateIndex, assigned, graph, palette, usage, cfg, preferredIndex) {
+    let score = 0;
+    let hardConflict = false;
+    const neighbors = graph.get(category);
+    const candidateLab = palette[candidateIndex].lab;
+    if (neighbors) {
+      neighbors.forEach((edge, neighbor) => {
+        const neighborIndex = assigned.get(neighbor);
+        if (neighborIndex == null) return;
+        const distance = oklabDistance(candidateLab, palette[neighborIndex].lab);
+        if (edge.sameMarkerCount > 0 && distance < cfg.minSameMarkerDistance) {
+          hardConflict = true;
+          score -= cfg.hardPenalty * (cfg.minSameMarkerDistance - distance) * edge.sameMarkerCount;
+        }
+        if (edge.adjacentCount > 0 && distance < cfg.minVisualAdjacencyDistance) {
+          hardConflict = true;
+          score -= cfg.hardPenalty * (cfg.minVisualAdjacencyDistance - distance) * edge.adjacentCount * 0.45;
+        }
+        if (edge.geographicCount > 0 && distance < cfg.minGeographicSeparationDistance) {
+          hardConflict = true;
+          score -= cfg.hardPenalty * (cfg.minGeographicSeparationDistance - distance) * edge.geographicCount * 0.35;
+        }
+        score += edge.weight * distance;
+      });
+    }
+    const usedCount = usage.get(candidateIndex) || 0;
+    if (usedCount > 0 && assigned.size < palette.length) {
+      hardConflict = true;
+      score -= cfg.hardPenalty * usedCount;
+    }
+    if (assigned.size < palette.length) {
+      assigned.forEach((assignedIndex) => {
+        if (assignedIndex == null) return;
+        const distance = oklabDistance(candidateLab, palette[assignedIndex].lab);
+        if (distance < cfg.minGlobalColorDistance) {
+          score -= cfg.globalColorSeparationWeight * ((cfg.minGlobalColorDistance - distance) / cfg.minGlobalColorDistance);
+        }
+      });
+    }
+    score -= usedCount * cfg.colorReusePenalty;
+    score -= circularIndexDistance(candidateIndex, preferredIndex, palette.length) * cfg.hashDeviationPenalty;
+    return { score, hardConflict };
+  }
+
+  function pickBestMarkerColorIndex(category, assigned, graph, palette, usage, cfg, preferredIndex) {
+    let bestIndex = preferredIndex;
+    let bestScore = Number.NEGATIVE_INFINITY;
+    let bestIsHardConflict = true;
+    buildCandidateColorOrder(preferredIndex, palette.length).forEach((index) => {
+      const { score, hardConflict } = scoreMarkerColorChoice(category, index, assigned, graph, palette, usage, cfg, preferredIndex);
+      if (bestIsHardConflict) {
+        if (!hardConflict || score > bestScore) {
+          bestIndex = index;
+          bestScore = score;
+          bestIsHardConflict = hardConflict;
+        }
+      } else if (!hardConflict && score > bestScore) {
+        bestIndex = index;
+        bestScore = score;
+      }
+    });
+    return bestIndex;
+  }
+
+  function totalMarkerColorObjective(categories, assigned, graph, palette, cfg) {
+    let score = 0;
+    categories.forEach((category, index) => {
+      const neighbors = graph.get(category);
+      if (!neighbors) return;
+      categories.slice(index + 1).forEach((otherCategory) => {
+        const edge = neighbors.get(otherCategory);
+        if (!edge) return;
+        const categoryIndex = assigned.get(category);
+        const otherIndex = assigned.get(otherCategory);
+        if (categoryIndex == null || otherIndex == null) return;
+        const distance = oklabDistance(palette[categoryIndex].lab, palette[otherIndex].lab);
+        if (edge.sameMarkerCount > 0 && distance < cfg.minSameMarkerDistance) {
+          score -= cfg.hardPenalty * (cfg.minSameMarkerDistance - distance) * edge.sameMarkerCount;
+        }
+        if (edge.adjacentCount > 0 && distance < cfg.minVisualAdjacencyDistance) {
+          score -= cfg.hardPenalty * (cfg.minVisualAdjacencyDistance - distance) * edge.adjacentCount * 0.45;
+        }
+        if (edge.geographicCount > 0 && distance < cfg.minGeographicSeparationDistance) {
+          score -= cfg.hardPenalty * (cfg.minGeographicSeparationDistance - distance) * edge.geographicCount * 0.35;
+        }
+        score += edge.weight * distance;
+      });
+    });
+    if (categories.length <= palette.length) {
+      categories.forEach((category, index) => {
+        const categoryIndex = assigned.get(category);
+        if (categoryIndex == null) return;
+        categories.slice(index + 1).forEach((otherCategory) => {
+          const otherIndex = assigned.get(otherCategory);
+          if (otherIndex == null) return;
+          const distance = oklabDistance(palette[categoryIndex].lab, palette[otherIndex].lab);
+          if (distance < cfg.minGlobalColorDistance) {
+            score -= cfg.globalColorSeparationWeight * ((cfg.minGlobalColorDistance - distance) / cfg.minGlobalColorDistance);
+          }
+        });
+      });
+    }
+    return score;
+  }
+
+  function improveMarkerColorsBySwapping(categories, assigned, graph, palette, cfg) {
+    let improved = true;
+    let pass = 0;
+    while (improved && pass < cfg.maxImprovePasses) {
+      improved = false;
+      pass += 1;
+      categories.forEach((category, index) => {
+        categories.slice(index + 1).forEach((otherCategory) => {
+          const current = assigned.get(category);
+          const other = assigned.get(otherCategory);
+          if (current == null || other == null || current === other) return;
+          const before = totalMarkerColorObjective(categories, assigned, graph, palette, cfg);
+          assigned.set(category, other);
+          assigned.set(otherCategory, current);
+          const after = totalMarkerColorObjective(categories, assigned, graph, palette, cfg);
+          if (after > before) {
+            improved = true;
+          } else {
+            assigned.set(category, current);
+            assigned.set(otherCategory, other);
+          }
+        });
+      });
+    }
+  }
+
+  function assignMarkerColorIndexes(categories = [], graph = new Map(), palette = [], cfg = MARKER_COLOR_ASSIGNMENT_CONFIG, mode = "fast") {
+    const originalIndex = new Map(categories.map((value, index) => [value, index]));
+    const totalWeights = new Map();
+    const sameMarkerDegrees = new Map();
+    const visualAdjacencyDegrees = new Map();
+    const geographicDegrees = new Map();
+    categories.forEach((category) => {
+      let total = 0;
+      let sameMarkerCount = 0;
+      let adjacentCount = 0;
+      let geographicCount = 0;
+      graph.get(category)?.forEach((edge) => {
+        total += edge.weight;
+        sameMarkerCount += edge.sameMarkerCount || 0;
+        adjacentCount += edge.adjacentCount || 0;
+        geographicCount += edge.geographicCount || 0;
+      });
+      totalWeights.set(category, total);
+      sameMarkerDegrees.set(category, sameMarkerCount);
+      visualAdjacencyDegrees.set(category, adjacentCount);
+      geographicDegrees.set(category, geographicCount);
+    });
+    const assignmentOrder = [...categories].sort((a, b) => {
+      if (mode === "fast") {
+        const sameDiff = (sameMarkerDegrees.get(b) || 0) - (sameMarkerDegrees.get(a) || 0);
+        if (sameDiff !== 0) return sameDiff;
+        const adjacentDiff = (visualAdjacencyDegrees.get(b) || 0) - (visualAdjacencyDegrees.get(a) || 0);
+        if (adjacentDiff !== 0) return adjacentDiff;
+        const geographicDiff = (geographicDegrees.get(b) || 0) - (geographicDegrees.get(a) || 0);
+        if (geographicDiff !== 0) return geographicDiff;
+      }
+      const weightDiff = (totalWeights.get(b) || 0) - (totalWeights.get(a) || 0);
+      if (weightDiff !== 0) return weightDiff;
+      return (originalIndex.get(a) || 0) - (originalIndex.get(b) || 0);
+    });
+    const assigned = new Map();
+    const usage = new Map();
+    assignmentOrder.forEach((category) => {
+      const preferredIndex = positiveMod(originalIndex.get(category) ?? hashString(category), palette.length);
+      const colorIndex = pickBestMarkerColorIndex(category, assigned, graph, palette, usage, cfg, preferredIndex);
+      assigned.set(category, colorIndex);
+      usage.set(colorIndex, (usage.get(colorIndex) || 0) + 1);
+    });
+    if (mode === "optimized") {
+      improveMarkerColorsBySwapping(categories, assigned, graph, palette, cfg);
+    }
+    return assigned;
+  }
+
   function taxonKey(value) {
     return normalizeText(value) || "分類群未入力";
   }
@@ -1700,6 +2417,10 @@
     return configuredColorField(getActiveDataset(), state.headers);
   }
 
+  function colorValueLabel(value) {
+    return value === COLOR_BY_UNKNOWN_KEY ? "未設定" : value;
+  }
+
   function activePopupTitleField() {
     return configuredPopupTitleField(getActiveDataset(), state.headers);
   }
@@ -1707,12 +2428,14 @@
   function getRecordColorValue(record) {
     const field = activeColorField();
     if (!field) return "";
-    return colorKey(record?.__values?.[field]);
+    const value = normalizeText(record?.__values?.[field]);
+    return value || COLOR_BY_UNKNOWN_KEY;
   }
 
   function colorForColorValue(value) {
     const text = normalizeText(value);
     if (!text) return DEFAULT_MARKER_COLOR;
+    if (text === COLOR_BY_UNKNOWN_KEY) return OTHER_MARKER_COLOR;
     return state.taxonColors.get(text) || fallbackColorForColorValue(text);
   }
 
@@ -1721,7 +2444,9 @@
   }
 
   function fallbackColorForColorValue(value) {
-    return TAXON_COLOR_PALETTE[hashString(colorKey(value)) % TAXON_COLOR_PALETTE.length];
+    const palette = generateMarkerColorPalette();
+    if (!palette.length) return DEFAULT_MARKER_COLOR;
+    return palette[hashString(colorKey(value)) % palette.length].css;
   }
 
   function assignTaxonColors(records) {
@@ -1730,6 +2455,28 @@
       state.taxonColors = new Map();
       return;
     }
+
+    const valuesForColoring = [...new Set(records.map((record) => getRecordColorValue(record)).filter(Boolean))]
+      .sort(naturalCompareValues);
+    const colorMap = new Map();
+    colorMap.set(COLOR_BY_UNKNOWN_KEY, OTHER_MARKER_COLOR);
+
+    const categories = valuesForColoring.filter((value) => value !== COLOR_BY_UNKNOWN_KEY);
+    const markerPalette = generateMarkerColorPalette();
+    if (categories.length && markerPalette.length) {
+      const colorRows = buildColorAssignmentRows(records)
+        .filter((row) => categories.includes(row.category));
+      const graph = buildMarkerColorGraph(categories, colorRows, MARKER_COLOR_ASSIGNMENT_CONFIG);
+      const mode = chooseMarkerColorMode(categories.length, MARKER_COLOR_ASSIGNMENT_CONFIG);
+      const assigned = assignMarkerColorIndexes(categories, graph, markerPalette, MARKER_COLOR_ASSIGNMENT_CONFIG, mode);
+      categories.forEach((category) => {
+        const colorIndex = assigned.get(category);
+        colorMap.set(category, markerPalette[colorIndex ?? positiveMod(hashString(category), markerPalette.length)].css);
+      });
+    }
+
+    state.taxonColors = colorMap;
+    return;
 
     const values = [...new Set(records.map((record) => getRecordColorValue(record)))]
       .sort((a, b) => a.localeCompare(b, "ja"));
@@ -3602,9 +4349,10 @@
     }
 
     taxonLegendEl.innerHTML = values.map((value) => {
+      const label = colorValueLabel(value);
       const labelHtml = colorField === COLUMNS.taxon || colorField === LEGACY_TAXON_HEADER
-        ? formatTaxonHTML(value)
-        : escapeHTML(value);
+        ? formatTaxonHTML(label)
+        : escapeHTML(label);
       return `
         <div class="taxon-row">
           <span class="taxon-chip" style="background: ${colorForColorValue(value)}"></span>
