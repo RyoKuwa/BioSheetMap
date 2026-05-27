@@ -195,10 +195,18 @@
   const ACTIVE_DATASET_STORAGE_KEY = CONFIG.ACTIVE_DATASET_STORAGE_KEY || "fieldMap.activeDatasetId.v1";
   const TOPBAR_COLLAPSED_STORAGE_KEY = CONFIG.TOPBAR_COLLAPSED_STORAGE_KEY || "fieldMap.topbarCollapsed.v1";
   const FILTERS_STORAGE_KEY_PREFIX = CONFIG.FILTERS_STORAGE_KEY_PREFIX || "fieldMap.filters.v1";
-  titleEl.textContent = CONFIG.TITLE || "調査結果地図";
+  const APP_TITLE = CONFIG.TITLE || "BioSheetMap";
+  updatePageTitle();
 
   function setStatus(message) {
     statusEl.textContent = message;
+  }
+
+  function updatePageTitle() {
+    const dataset = getActiveDataset();
+    const title = dataset?.name || APP_TITLE;
+    if (titleEl) titleEl.textContent = title;
+    document.title = dataset?.name ? `${dataset.name} - ${APP_TITLE}` : APP_TITLE;
   }
 
   function makeAbortError() {
@@ -1146,6 +1154,7 @@
         datasetRegisterButton.disabled = true;
         datasetRegisterButton.classList.add("is-inactive");
       }
+      updatePageTitle();
       updateFilterSummary();
       updateFocusControlState();
       return;
@@ -1171,6 +1180,7 @@
     if (datasetDeleteButton) datasetDeleteButton.disabled = state.isLoading || !registered;
     if (datasetShareButton) datasetShareButton.disabled = state.isLoading || !hasActive;
     if (filterButton) filterButton.disabled = state.isLoading || state.rows.length === 0;
+    updatePageTitle();
     updateFilterSummary();
     updateFocusControlState();
 
@@ -4448,12 +4458,21 @@
   }
 
   function renderLegends(records) {
-    renderRecordTypeLegend(records);
-    renderTaxonLegend(records);
+    const hasShapeLegend = renderRecordTypeLegend(records);
+    const hasColorLegend = renderTaxonLegend(records);
+    const legendEl = document.getElementById("legend");
+    if (legendEl) {
+      legendEl.hidden = !hasShapeLegend && !hasColorLegend;
+    }
+  }
+
+  function setLegendBlockVisible(contentEl, visible) {
+    const block = contentEl?.closest(".legend-block");
+    if (block) block.hidden = !visible;
   }
 
   function renderRecordTypeLegend(records) {
-    if (!recordTypeLegendEl) return;
+    if (!recordTypeLegendEl) return false;
 
     const shapeField = activeMarkerShapeField();
     const shapeMap = configuredMarkerShapeMap(getActiveDataset());
@@ -4463,32 +4482,34 @@
     const values = [...new Set(records.map((record) => record.markerShapeValue || ""))].filter(Boolean)
       .sort((a, b) => a.localeCompare(b, "ja"));
 
-    if (!records.length) {
-      recordTypeLegendEl.innerHTML = '<div class="legend-row legend-empty">表示中の記録はありません</div>';
-      return;
+    if (!records.length || !shapeField || !values.length) {
+      recordTypeLegendEl.innerHTML = "";
+      setLegendBlockVisible(recordTypeLegendEl, false);
+      return false;
     }
 
-    if (!shapeField || !values.length) {
-      recordTypeLegendEl.innerHTML = `
-        <div class="legend-row">
-          ${markerSvg(DEFAULT_MARKER_SHAPE, [{ color: DEFAULT_MARKER_COLOR, kind: DEFAULT_MARKER_SHAPE }])}
-          <span>すべて ${markerShapeLabel(DEFAULT_MARKER_SHAPE)}</span>
-        </div>`;
-      return;
+    const entries = values.map((value) => ({
+      value,
+      shape: normalizeMarkerShapeId(shapeMap[value] || DEFAULT_MARKER_SHAPE),
+    }));
+    const shapeCount = new Set(entries.map((entry) => entry.shape)).size;
+    if (shapeCount < 2) {
+      recordTypeLegendEl.innerHTML = "";
+      setLegendBlockVisible(recordTypeLegendEl, false);
+      return false;
     }
 
-    recordTypeLegendEl.innerHTML = values.map((value) => {
-      const shape = normalizeMarkerShapeId(shapeMap[value] || DEFAULT_MARKER_SHAPE);
-      return `
+    recordTypeLegendEl.innerHTML = entries.map(({ value, shape }) => `
       <div class="legend-row">
         ${markerSvg(shape, [{ color: DEFAULT_MARKER_COLOR, kind: shape }])}
         <span>${escapeHTML(value)}</span>
-      </div>`;
-    }).join("");
+      </div>`).join("");
+    setLegendBlockVisible(recordTypeLegendEl, true);
+    return true;
   }
 
   function renderTaxonLegend(records) {
-    if (!taxonLegendEl) return;
+    if (!taxonLegendEl) return false;
 
     const colorField = activeColorField();
     if (colorLegendTitleEl) {
@@ -4496,16 +4517,18 @@
     }
 
     if (!colorField) {
-      taxonLegendEl.innerHTML = '<div class="taxon-row legend-empty">色分け項目が未選択です</div>';
-      return;
+      taxonLegendEl.innerHTML = "";
+      setLegendBlockVisible(taxonLegendEl, false);
+      return false;
     }
 
     const values = [...new Set(records.map((record) => getRecordColorValue(record)))]
       .sort((a, b) => a.localeCompare(b, "ja"));
 
-    if (!values.length) {
-      taxonLegendEl.innerHTML = '<div class="taxon-row legend-empty">表示中の記録はありません</div>';
-      return;
+    if (values.length < 2) {
+      taxonLegendEl.innerHTML = "";
+      setLegendBlockVisible(taxonLegendEl, false);
+      return false;
     }
 
     taxonLegendEl.innerHTML = values.map((value) => {
@@ -4519,6 +4542,8 @@
           <span>${labelHtml}</span>
         </div>`;
     }).join("");
+    setLegendBlockVisible(taxonLegendEl, true);
+    return true;
   }
 
   function setupPopupClose() {
