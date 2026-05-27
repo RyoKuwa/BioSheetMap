@@ -1,0 +1,2777 @@
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f7f7f7;
+  color: #222;
+}
+
+#app {
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+#app.topbar-collapsed {
+  grid-template-rows: 1fr;
+}
+
+#topbar {
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(8px + env(safe-area-inset-top)) 12px 8px 12px;
+  background: rgba(255, 255, 255, 0.94);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+}
+
+.topbar-main {
+  min-width: 0;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.topbar-toggle-button,
+.topbar-open-button {
+  min-width: 62px;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #222;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.topbar-toggle-button {
+  flex: 0 0 auto;
+}
+
+.topbar-open-button {
+  position: fixed;
+  top: calc(8px + env(safe-area-inset-top));
+  left: 10px;
+  z-index: 12;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+}
+
+#app.topbar-collapsed #topbar {
+  display: none;
+}
+
+#title {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#status {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #555;
+  line-height: 1.35;
+}
+
+#reload-button {
+  min-width: 64px;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  border-radius: 999px;
+  background: #fff;
+  color: #222;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#reload-button:active,
+.topbar-toggle-button:active,
+.topbar-open-button:active,
+.record-marker:active,
+.popup-nav-fixed button:active {
+  transform: translateY(1px);
+}
+
+#reload-button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+#map {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+#legend {
+  position: fixed;
+  left: 10px;
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  /* マーカーは z-index 100 以上で前面順を制御するため、凡例はそれより手前、モーダルはさらに手前に出す。 */
+  z-index: 500;
+  max-width: min(360px, calc(100vw - 20px));
+  max-height: 45vh;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.93);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+}
+
+#legend details summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+
+.legend-block {
+  margin-top: 8px;
+}
+
+.legend-title {
+  margin-bottom: 4px;
+  font-weight: 700;
+  color: #444;
+}
+
+.legend-row,
+.taxon-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0;
+  line-height: 1.3;
+}
+
+.legend-row svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.8));
+}
+
+.legend-symbol,
+.taxon-chip {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.legend-symbol.star {
+  width: 16px;
+  height: 16px;
+  background: #777;
+  clip-path: polygon(50% 0%, 62% 35%, 99% 35%, 69% 57%, 80% 92%, 50% 70%, 20% 92%, 31% 57%, 1% 35%, 38% 35%);
+}
+
+.legend-symbol.square {
+  width: 13px;
+  height: 13px;
+  background: #777;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+}
+
+.legend-symbol.hollow {
+  width: 13px;
+  height: 13px;
+  border: 2px solid #777;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.legend-symbol.filled {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #777;
+}
+
+.legend-symbol.x {
+  position: relative;
+  width: 15px;
+  height: 15px;
+}
+
+.legend-symbol.x::before,
+.legend-symbol.x::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 1px;
+  width: 3px;
+  height: 13px;
+  border-radius: 999px;
+  background: #777;
+}
+
+.legend-symbol.x::before {
+  transform: rotate(45deg);
+}
+
+.legend-symbol.x::after {
+  transform: rotate(-45deg);
+}
+
+.legend-symbol.triangle {
+  width: 15px;
+  height: 14px;
+  background: #777;
+  clip-path: polygon(50% 5%, 95% 95%, 5% 95%);
+}
+
+.legend-symbol.unknown {
+  background: #999;
+  opacity: 0.65;
+}
+
+.legend-empty {
+  color: #666;
+  font-size: 11px;
+}
+
+.taxon-chip {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+.record-marker {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  -webkit-clip-path: circle(40% at 50% 50%);
+  clip-path: circle(40% at 50% 50%);
+}
+
+.record-marker.kind-star-filled,
+.record-marker.kind-star-hollow {
+  width: 32px;
+  height: 32px;
+  -webkit-clip-path: polygon(50% 6.7%, 61.7% 35%, 92.1% 37.1%, 68.8% 56.7%, 75.8% 86.7%, 50% 70.8%, 24.2% 86.7%, 31.3% 56.7%, 7.9% 37.1%, 38.3% 35%);
+  clip-path: polygon(50% 6.7%, 61.7% 35%, 92.1% 37.1%, 68.8% 56.7%, 75.8% 86.7%, 50% 70.8%, 24.2% 86.7%, 31.3% 56.7%, 7.9% 37.1%, 38.3% 35%);
+}
+
+.record-marker.kind-square-filled,
+.record-marker.kind-square-hollow {
+  -webkit-clip-path: inset(17% 17% 17% 17% round 2px);
+  clip-path: inset(17% 17% 17% 17% round 2px);
+}
+
+.record-marker.kind-diamond-filled,
+.record-marker.kind-diamond-hollow {
+  -webkit-clip-path: polygon(50% 10%, 90% 50%, 50% 90%, 10% 50%);
+  clip-path: polygon(50% 10%, 90% 50%, 50% 90%, 10% 50%);
+}
+
+.record-marker.kind-x {
+  -webkit-clip-path: polygon(18% 6%, 50% 38%, 82% 6%, 94% 18%, 62% 50%, 94% 82%, 82% 94%, 50% 62%, 18% 94%, 6% 82%, 38% 50%, 6% 18%);
+  clip-path: polygon(18% 6%, 50% 38%, 82% 6%, 94% 18%, 62% 50%, 94% 82%, 82% 94%, 50% 62%, 18% 94%, 6% 82%, 38% 50%, 6% 18%);
+}
+
+.record-marker.kind-triangle-up-filled,
+.record-marker.kind-triangle-up-hollow {
+  -webkit-clip-path: polygon(50% 15%, 87% 82%, 13% 82%);
+  clip-path: polygon(50% 15%, 87% 82%, 13% 82%);
+}
+
+.record-marker.kind-triangle-down-filled,
+.record-marker.kind-triangle-down-hollow {
+  -webkit-clip-path: polygon(13% 18%, 87% 18%, 50% 85%);
+  clip-path: polygon(13% 18%, 87% 18%, 50% 85%);
+}
+
+.maplibregl-marker.record-marker {
+  position: absolute;
+}
+
+#map.markers-hidden .maplibregl-marker.record-marker {
+  display: none !important;
+}
+
+
+.record-marker svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.record-marker:focus {
+  outline: 3px solid rgba(0, 95, 255, 0.45);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+
+
+.field-map-focus-control .field-map-focus-button {
+  width: 29px;
+  height: 29px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.field-map-focus-control .field-map-focus-button:disabled {
+  color: #9aa4ad;
+  cursor: default;
+}
+
+.field-map-focus-control .field-map-focus-button:disabled .field-map-focus-icon {
+  opacity: 0.68;
+}
+
+.field-map-focus-control .field-map-focus-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.field-map-focus-icon {
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+.maplibregl-popup {
+  z-index: 10000 !important;
+  pointer-events: none;
+}
+
+.maplibregl-popup-content {
+  pointer-events: auto;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  border-radius: 10px;
+  box-shadow: 0 3px 16px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+  word-wrap: break-word;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.maplibregl-popup-close-button {
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  font-size: 18px;
+  line-height: 28px;
+}
+
+.popup-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-width: 250px;
+  max-width: min(360px, calc(100vw - 28px));
+  background: #fff;
+}
+
+.popup-scroll-container {
+  overflow-y: auto;
+  flex: 1;
+  padding: 10px 12px;
+  border-top: 1px solid #ddd;
+  border-bottom: 1px solid #ddd;
+}
+
+.popup-nav-fixed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 7px 10px;
+  background: #fff;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.popup-nav-fixed button {
+  padding: 5px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.24);
+  border-radius: 999px;
+  background: #f7f7f7;
+  color: #222;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.popup-counter {
+  min-width: 42px;
+  color: #444;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.popup-content {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.popup-title {
+  margin: 0 24px 8px 0;
+  font-size: 15px;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1.35;
+}
+
+.popup-row {
+  display: grid;
+  grid-template-columns: 94px 1fr;
+  gap: 7px;
+  margin: 5px 0;
+}
+
+.popup-label {
+  color: #555;
+  font-weight: 700;
+}
+
+.popup-value {
+  overflow-wrap: anywhere;
+}
+
+.popup-link-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  padding: 1px 9px;
+  border: 1px solid #7d8791;
+  border-radius: 999px;
+  background: #f7fafc;
+  color: #0b4a6f;
+  text-decoration: none;
+  font-size: 0.92em;
+  white-space: nowrap;
+}
+
+.popup-link-pill:hover {
+  background: #eaf2f8;
+}
+
+.maplibregl-ctrl-bottom-right,
+.maplibregl-ctrl-bottom-left {
+  margin-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 720px) {
+  #topbar {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .topbar-actions {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+
+  #title {
+    white-space: normal;
+  }
+
+  #legend {
+    font-size: 11px;
+    max-height: 36vh;
+  }
+  #reload-button {
+    min-width: 58px;
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+
+  .popup-wrapper {
+    min-width: 238px;
+  }
+
+  .popup-row {
+    grid-template-columns: 86px 1fr;
+    gap: 6px;
+  }
+}
+
+.record-marker.multi-taxon svg {
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.8));
+}
+
+.popup-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.popup-title-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+}
+
+.popup-title-marker svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  overflow: visible;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.8));
+}
+
+.non-italic {
+  font-style: normal;
+}
+
+.popup-title i,
+.taxon-row i {
+  font-style: italic;
+}
+
+
+.basemap-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #333;
+  white-space: nowrap;
+}
+
+#basemap-select {
+  max-width: 112px;
+  padding: 7px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  border-radius: 999px;
+  background: #fff;
+  color: #222;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  #topbar {
+    align-items: flex-start;
+  }
+
+  .topbar-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .basemap-control span {
+    display: none;
+  }
+}
+
+.dataset-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #333;
+  white-space: nowrap;
+}
+
+#dataset-select {
+  max-width: min(220px, 34vw);
+  padding: 7px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  border-radius: 999px;
+  background: #fff;
+  color: #222;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+#dataset-add-button,
+#dataset-edit-button,
+#dataset-delete-button,
+#dataset-share-button {
+  padding: 7px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  border-radius: 999px;
+  background: #fff;
+  color: #222;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#dataset-add-button:active,
+#dataset-edit-button:active,
+#dataset-delete-button:active,
+#dataset-share-button:active {
+  transform: translateY(1px);
+}
+
+#dataset-add-button:disabled,
+#dataset-edit-button:disabled,
+#dataset-delete-button:disabled,
+#dataset-share-button:disabled,
+#dataset-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  #dataset-select {
+    max-width: 46vw;
+  }
+
+  #dataset-add-button,
+  #dataset-edit-button,
+  #dataset-delete-button,
+  #dataset-share-button {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 520px) {
+  .dataset-control span {
+    display: none;
+  }
+
+  #dataset-select {
+    max-width: 54vw;
+  }
+}
+
+
+body.modal-open {
+  overflow: hidden;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  /* メニューから開く入力画面・選択画面は、凡例とポップアップより前面に出す。 */
+  z-index: 20000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.42);
+  box-sizing: border-box;
+}
+
+.modal-overlay[hidden] {
+  display: none !important;
+}
+
+.dataset-field-settings[hidden],
+.dataset-fields-status[hidden] {
+  display: none !important;
+}
+
+.modal-panel {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.modal-close-button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 999px;
+  background: #fff;
+  color: #222;
+  font-size: 21px;
+  line-height: 28px;
+  cursor: pointer;
+}
+
+.modal-body {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.modal-help {
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 12px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.modal-help summary {
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #222;
+  cursor: pointer;
+  user-select: none;
+}
+
+.modal-help-content {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
+  color: #333;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.modal-help-content p {
+  margin: 0;
+}
+
+.modal-help-content ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.modal-help-content li + li {
+  margin-top: 4px;
+}
+
+.modal-help code {
+  padding: 1px 4px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.06);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.95em;
+}
+
+.modal-help .header-example {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 9px;
+  overflow-x: auto;
+  white-space: nowrap;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  color: #111;
+}
+
+.modal-field {
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #333;
+}
+
+.modal-field input,
+.modal-field textarea,
+.modal-field select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 11px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  background: #fff;
+  color: #222;
+  font: inherit;
+  font-weight: 500;
+}
+
+.modal-field textarea {
+  resize: vertical;
+  min-height: 74px;
+}
+
+.modal-field small {
+  color: #666;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.dataset-field-loader {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.dataset-field-loader small,
+.dataset-fieldset small {
+  color: #666;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.dataset-fields-status {
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 92, 158, 0.24);
+  border-radius: 10px;
+  background: #eef7ff;
+  color: #174a72;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.dataset-fields-status.is-error {
+  border-color: rgba(176, 0, 32, 0.35);
+  background: #fff1f3;
+  color: #9b001c;
+}
+
+.dataset-field-settings {
+  display: grid;
+  gap: 12px;
+}
+
+.dataset-fieldset {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.dataset-fieldset-title {
+  color: #222;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.dataset-field-list {
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.dataset-field-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.dataset-field-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: #333;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.dataset-field-check span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dataset-field-order-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.dataset-field-order-actions button {
+  min-width: 28px;
+  padding: 4px 7px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 999px;
+  background: #fff;
+  color: #333;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.dataset-shape-map {
+  display: grid;
+  gap: 6px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.dataset-shape-map-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px minmax(150px, 200px);
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.dataset-shape-map-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #333;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.dataset-shape-map-preview {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dataset-shape-map-preview svg {
+  width: 24px;
+  height: 24px;
+  display: block;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.8));
+}
+
+.dataset-shape-map-row select {
+  width: 100%;
+  min-width: 0;
+}
+
+.dataset-shape-map-empty {
+  margin: 0;
+  color: #666;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.modal-error {
+  padding: 9px 10px;
+  border: 1px solid rgba(176, 0, 32, 0.35);
+  border-radius: 10px;
+  background: #fff1f3;
+  color: #9b001c;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 16px 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.primary-button,
+.secondary-button {
+  min-width: 88px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-button {
+  border: 1px solid #174ea6;
+  background: #1a73e8;
+  color: #fff;
+}
+
+.secondary-button {
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  background: #fff;
+  color: #222;
+}
+
+@media (max-width: 520px) {
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 10px;
+  }
+
+  .modal-panel {
+    width: 100%;
+    max-height: calc(100vh - 20px);
+    border-radius: 16px 16px 12px 12px;
+  }
+
+  .modal-actions {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+  }
+}
+
+
+/* Compact top menu layout */
+#topbar {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: calc(7px + env(safe-area-inset-top)) 10px 8px 10px;
+}
+
+.topbar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.topbar-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.topbar-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.topbar-open-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.topbar-open-button[hidden] {
+  display: none !important;
+}
+
+.topbar-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  width: 100%;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.dataset-row {
+  justify-content: space-between;
+}
+
+.map-row {
+  justify-content: flex-end;
+}
+
+.dataset-control {
+  flex: 1 1 280px;
+  min-width: 160px;
+}
+
+#dataset-select {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.dataset-button-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.basemap-control {
+  flex: 0 1 auto;
+}
+
+#basemap-select {
+  max-width: 132px;
+}
+
+@media (min-width: 860px) {
+  #topbar {
+    grid-template-columns: minmax(180px, 0.8fr) minmax(460px, 1.6fr);
+    align-items: center;
+    gap: 10px 14px;
+  }
+
+  .topbar-head {
+    grid-column: 1;
+  }
+
+  .topbar-actions {
+    grid-column: 2;
+    grid-template-columns: minmax(320px, 1fr) auto;
+    align-items: center;
+  }
+
+  .map-row {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 720px) {
+  #topbar {
+    align-items: stretch;
+    gap: 7px;
+  }
+
+  .topbar-actions {
+    align-items: stretch;
+  }
+
+  .dataset-row {
+    align-items: stretch;
+  }
+
+  .dataset-control {
+    flex: 1 1 100%;
+  }
+
+  .dataset-button-group {
+    justify-content: flex-end;
+  }
+
+  .map-row {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 520px) {
+  .topbar-actions {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+
+  .dataset-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+  }
+
+  .dataset-control {
+    grid-column: 1 / -1;
+  }
+
+  .dataset-button-group {
+    grid-column: 1 / 2;
+    justify-content: flex-start;
+  }
+
+  .map-row {
+    grid-column: 2 / 3;
+    justify-content: flex-end;
+    align-self: center;
+  }
+
+  #dataset-add-button,
+  #dataset-edit-button,
+  #dataset-delete-button,
+  #dataset-share-button {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  #reload-button {
+    padding: 6px 9px;
+    font-size: 12px;
+    min-width: 52px;
+  }
+
+  #basemap-select {
+    max-width: 110px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+}
+
+/* Header close/open menu buttons */
+#topbar {
+  position: relative;
+  padding-right: 54px;
+}
+
+.topbar-head {
+  padding-right: 0;
+}
+
+.topbar-toggle-button {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top));
+  right: 10px;
+  z-index: 13;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.16);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.topbar-toggle-button:hover,
+.topbar-open-button:hover {
+  background: #fff;
+}
+
+.topbar-open-button {
+  left: 10px;
+  top: calc(8px + env(safe-area-inset-top));
+  z-index: 13;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+}
+
+@media (min-width: 860px) {
+  #topbar {
+    grid-template-columns: minmax(180px, 0.8fr) minmax(460px, 1.6fr);
+    padding-right: 58px;
+  }
+}
+
+@media (max-width: 520px) {
+  #topbar {
+    padding-right: 52px;
+  }
+
+  .topbar-toggle-button {
+    right: 8px;
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+  }
+}
+
+.share-modal-panel {
+  max-width: 560px;
+}
+
+.share-description {
+  margin: 0 0 8px;
+  color: #333;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+#share-url-output {
+  min-height: 96px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.share-source-field {
+  gap: 6px;
+}
+
+.share-source-link {
+  display: block;
+  max-width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #d9dee7;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #0b5cab;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+}
+
+.share-source-link[aria-disabled="true"] {
+  color: #777;
+  text-decoration: none;
+  pointer-events: none;
+}
+
+.share-modal-message {
+  min-height: 1.4em;
+  color: #155724;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Menu layout refinement */
+#topbar {
+  grid-template-columns: minmax(170px, 0.72fr) minmax(0, 1.45fr);
+  grid-template-areas: "head actions";
+  align-items: center;
+  gap: 10px 14px;
+  padding: calc(8px + env(safe-area-inset-top)) 58px 8px 12px;
+}
+
+.topbar-head {
+  grid-area: head;
+  min-width: 0;
+}
+
+.topbar-actions {
+  grid-area: actions;
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.control-row {
+  min-width: 0;
+}
+
+.dataset-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.dataset-control {
+  width: 100%;
+  min-width: 0;
+}
+
+#dataset-select {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.dataset-button-group {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  align-items: center;
+  gap: 6px;
+  min-width: max-content;
+}
+
+.map-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: max-content;
+}
+
+.basemap-control {
+  min-width: 0;
+}
+
+#basemap-select {
+  max-width: 132px;
+}
+
+.topbar-toggle-button {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top));
+  right: 10px;
+}
+
+@media (max-width: 860px) {
+  #topbar {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "head"
+      "actions";
+    align-items: stretch;
+    gap: 8px;
+    padding-right: 54px;
+  }
+
+  .topbar-actions {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .dataset-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .dataset-button-group {
+    width: 100%;
+    min-width: 0;
+    grid-auto-flow: unset;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  #dataset-add-button,
+  #dataset-edit-button,
+  #dataset-delete-button,
+  #dataset-share-button {
+    width: 100%;
+    min-width: 0;
+    padding: 7px 8px;
+    text-align: center;
+  }
+
+  .map-row {
+    width: 100%;
+    min-width: 0;
+    justify-content: space-between;
+  }
+
+  .basemap-control {
+    flex: 1 1 auto;
+  }
+
+  .basemap-control span,
+  .dataset-control span {
+    display: inline;
+  }
+
+  #basemap-select {
+    width: min(190px, 48vw);
+    max-width: none;
+  }
+
+  #reload-button {
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .dataset-button-group {
+    gap: 5px;
+  }
+
+  #dataset-add-button,
+  #dataset-edit-button,
+  #dataset-delete-button,
+  #dataset-share-button {
+    padding: 6px 5px;
+    font-size: 12px;
+  }
+
+  .basemap-control span {
+    display: none;
+  }
+
+  #basemap-select {
+    width: 140px;
+  }
+}
+
+/* Categorized menu layout */
+#topbar {
+  grid-template-columns: minmax(170px, 0.58fr) minmax(0, 1.72fr);
+  gap: 10px 14px;
+}
+
+.topbar-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 0.42fr);
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.menu-section {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.menu-section-title {
+  color: #444;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.dataset-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.dataset-button-group {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  align-items: center;
+  gap: 6px;
+}
+
+#dataset-add-button,
+#dataset-edit-button,
+#dataset-delete-button,
+#dataset-share-button,
+#reload-button {
+  white-space: nowrap;
+}
+
+.map-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.basemap-control {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.basemap-control span,
+.dataset-control span {
+  display: inline !important;
+}
+
+#basemap-select {
+  width: min(150px, 100%);
+  max-width: none;
+}
+
+#reload-button {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 980px) {
+  #topbar {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "head"
+      "actions";
+    align-items: stretch;
+  }
+
+  .topbar-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .dataset-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .dataset-button-group {
+    width: 100%;
+    min-width: 0;
+    grid-auto-flow: unset;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  #dataset-add-button,
+  #dataset-edit-button,
+  #dataset-delete-button,
+  #dataset-share-button {
+    width: 100%;
+    min-width: 0;
+    padding: 7px 8px;
+    text-align: center;
+  }
+
+  .map-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .basemap-control {
+    justify-content: flex-start;
+  }
+
+  #reload-button {
+    width: auto;
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 560px) {
+  .menu-section {
+    padding: 7px;
+  }
+
+  .dataset-button-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #dataset-add-button,
+  #dataset-edit-button,
+  #dataset-delete-button,
+  #dataset-share-button,
+  #reload-button {
+    padding: 7px 7px;
+    font-size: 12px;
+  }
+
+  .map-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .basemap-control {
+    justify-content: space-between;
+  }
+
+  #basemap-select {
+    width: min(170px, 54vw);
+  }
+
+  #reload-button {
+    width: 100%;
+  }
+}
+
+/* Help modal and menu help section */
+.modal-note {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #d9e2ef;
+  border-radius: 12px;
+  background: #f7faff;
+  color: #333;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.help-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  min-width: 0;
+}
+
+#help-button {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  border-radius: 999px;
+  background: #fff;
+  color: #222;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#help-button:active {
+  transform: translateY(1px);
+}
+
+.help-modal-panel {
+  max-width: 680px;
+}
+
+.help-modal-body {
+  display: grid;
+  gap: 14px;
+}
+
+.help-content-section {
+  display: grid;
+  gap: 8px;
+}
+
+.help-content-section h3 {
+  margin: 0;
+  color: #222;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.help-content-section p,
+.help-content-section li {
+  margin: 0;
+  color: #333;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.help-content-section ol,
+.help-content-section ul {
+  margin: 0;
+  padding-left: 1.45em;
+}
+
+.help-content-section code:not(.header-example) {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #f1f5f9;
+}
+
+.help-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #d8e1ec;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.help-table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.help-table th,
+.help-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e6edf5;
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.55;
+}
+
+.help-table th {
+  background: #f7faff;
+  color: #222;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.help-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.header-copy-line {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 9px 10px;
+  overflow-x: auto;
+  border: 1px solid #d8e1ec;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #111;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+.header-copy-line code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (min-width: 981px) {
+  .topbar-actions {
+    grid-template-columns: minmax(0, 1fr) minmax(230px, 0.42fr) minmax(96px, 0.18fr);
+  }
+}
+
+@media (max-width: 980px) {
+  .help-row {
+    width: 100%;
+  }
+
+  #help-button {
+    width: 100%;
+    padding: 7px 8px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 560px) {
+  #help-button {
+    padding: 7px 7px;
+    font-size: 12px;
+  }
+}
+
+/* Registration button and updated dataset controls */
+#dataset-register-button {
+  padding: 7px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  border-radius: 999px;
+  background: #fff;
+  color: #222;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#dataset-register-button:active {
+  transform: translateY(1px);
+}
+
+#dataset-register-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 980px) {
+  .dataset-button-group {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  #dataset-register-button {
+    width: 100%;
+    min-width: 0;
+    padding: 7px 8px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 560px) {
+  .dataset-button-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #dataset-register-button {
+    padding: 7px 7px;
+    font-size: 12px;
+  }
+}
+
+/* Final menu organization refinement */
+#topbar {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.52fr) minmax(0, 1.78fr);
+  grid-template-areas: "head actions";
+  align-items: stretch;
+  gap: 10px 14px;
+  padding: calc(8px + env(safe-area-inset-top)) 58px 9px 12px;
+}
+
+.topbar-head {
+  grid-area: head;
+  align-self: center;
+}
+
+.topbar-actions {
+  grid-area: actions;
+  display: grid;
+  grid-template-columns: minmax(360px, 1.6fr) minmax(210px, 0.72fr) minmax(92px, 0.28fr);
+  align-items: stretch;
+  gap: 10px;
+  min-width: 0;
+}
+
+.menu-section {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 7px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.menu-section-title {
+  color: #3b3b3b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+}
+
+.control-row {
+  min-width: 0;
+}
+
+.dataset-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dataset-control,
+.basemap-control {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  width: 100%;
+  font-size: 12px;
+  font-weight: 700;
+  color: #333;
+  white-space: nowrap;
+}
+
+#dataset-select,
+#basemap-select {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+.dataset-button-group {
+  display: grid;
+  grid-template-columns: repeat(5, max-content);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+#dataset-add-button,
+#dataset-edit-button,
+#dataset-delete-button,
+#dataset-share-button,
+#dataset-register-button,
+#reload-button,
+#help-button {
+  min-height: 34px;
+  padding: 7px 11px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  border-radius: 999px;
+  background: #fff;
+  color: #222;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+#dataset-register-button.is-registerable {
+  border-color: rgba(0, 94, 184, 0.35);
+  background: #eef6ff;
+  color: #064f91;
+}
+
+#dataset-register-button.is-registered:disabled {
+  border-color: rgba(0, 128, 72, 0.28);
+  background: #eef8f2;
+  color: #26724a;
+  opacity: 1;
+  cursor: default;
+}
+
+#dataset-register-button.is-inactive:disabled,
+#dataset-edit-button:disabled,
+#dataset-delete-button:disabled,
+#dataset-share-button:disabled,
+#reload-button:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+.map-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.help-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+}
+
+#help-button {
+  width: 100%;
+}
+
+@media (max-width: 1120px) {
+  #topbar {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "head"
+      "actions";
+    align-items: stretch;
+  }
+
+  .topbar-actions {
+    grid-template-columns: minmax(0, 1fr) minmax(190px, 0.56fr) minmax(86px, 0.24fr);
+  }
+
+  .dataset-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .dataset-button-group {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  #dataset-add-button,
+  #dataset-edit-button,
+  #dataset-delete-button,
+  #dataset-share-button,
+  #dataset-register-button {
+    width: 100%;
+    min-width: 0;
+    padding-right: 7px;
+    padding-left: 7px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 760px) {
+  #topbar {
+    padding-right: 54px;
+  }
+
+  .topbar-actions {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .menu-section {
+    padding: 8px;
+  }
+
+  .dataset-button-group {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .map-row {
+    grid-template-columns: minmax(0, 1fr) minmax(88px, max-content);
+  }
+}
+
+@media (max-width: 480px) {
+  #topbar {
+    gap: 7px;
+    padding-left: 9px;
+    padding-right: 50px;
+  }
+
+  .menu-section {
+    padding: 7px;
+    border-radius: 14px;
+  }
+
+  .dataset-control,
+  .basemap-control {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .dataset-button-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  #dataset-add-button,
+  #dataset-edit-button,
+  #dataset-delete-button,
+  #dataset-share-button,
+  #dataset-register-button,
+  #reload-button,
+  #help-button {
+    min-height: 33px;
+    padding: 6px 7px;
+    font-size: 12px;
+  }
+
+  .map-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .basemap-control span,
+  .dataset-control span {
+    display: inline !important;
+  }
+}
+
+/* Narrow desktop layout refinement */
+@media (max-width: 1120px) and (min-width: 761px) {
+  #topbar {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "head"
+      "actions";
+  }
+
+  .topbar-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .dataset-row {
+    grid-template-columns: minmax(240px, 1fr) auto;
+    align-items: center;
+  }
+
+  .dataset-button-group {
+    grid-template-columns: repeat(auto-fit, minmax(64px, max-content));
+    justify-content: end;
+    max-width: 100%;
+  }
+
+  #dataset-add-button,
+  #dataset-edit-button,
+  #dataset-delete-button,
+  #dataset-share-button,
+  #dataset-register-button {
+    width: auto;
+    min-width: 64px;
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .map-row {
+    grid-template-columns: minmax(240px, 1fr) max-content;
+  }
+}
+
+@media (max-width: 900px) and (min-width: 761px) {
+  .dataset-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .dataset-button-group {
+    grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+    justify-content: stretch;
+  }
+
+  #dataset-add-button,
+  #dataset-edit-button,
+  #dataset-delete-button,
+  #dataset-share-button,
+  #dataset-register-button {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* Fix dataset action overflow on narrow desktop widths */
+.dataset-button-group {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+}
+
+#dataset-add-button,
+#dataset-edit-button,
+#dataset-delete-button,
+#dataset-share-button,
+#dataset-register-button {
+  flex: 0 1 auto;
+  min-width: 58px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+#dataset-register-button {
+  min-width: 72px;
+}
+
+@media (max-width: 1120px) {
+  .dataset-button-group {
+    justify-content: flex-start;
+  }
+
+  #dataset-add-button,
+  #dataset-edit-button,
+  #dataset-delete-button,
+  #dataset-share-button,
+  #dataset-register-button {
+    flex: 1 1 76px;
+    width: auto;
+  }
+}
+
+@media (max-width: 900px) and (min-width: 761px) {
+  .dataset-button-group {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-content: stretch;
+  }
+
+  #dataset-add-button,
+  #dataset-edit-button,
+  #dataset-delete-button,
+  #dataset-share-button,
+  #dataset-register-button {
+    width: 100%;
+    min-width: 0;
+    padding-right: 7px;
+    padding-left: 7px;
+  }
+}
+
+@media (max-width: 560px) {
+  .dataset-button-group {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #dataset-add-button,
+  #dataset-edit-button,
+  #dataset-delete-button,
+  #dataset-share-button,
+  #dataset-register-button {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* Filter menu and modal */
+@media (min-width: 1121px) {
+  .topbar-actions {
+    grid-template-columns: minmax(360px, 1.52fr) minmax(200px, 0.6fr) minmax(150px, 0.42fr) minmax(92px, 0.24fr);
+  }
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  align-content: center;
+}
+
+#filter-button {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 11px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  border-radius: 999px;
+  background: #fff;
+  color: #222;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#filter-button.is-filtered {
+  border-color: rgba(0, 94, 184, 0.35);
+  background: #eef6ff;
+  color: #064f91;
+}
+
+#filter-button:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+.filter-summary {
+  color: #555;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.filter-modal-panel {
+  max-width: 760px;
+}
+
+.filter-modal-body {
+  gap: 14px;
+}
+
+.filter-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.compact-button {
+  min-width: 0;
+  padding: 7px 11px;
+  font-size: 13px;
+}
+
+.filter-options {
+  display: grid;
+  gap: 12px;
+}
+
+.filter-fieldset {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.filter-fieldset-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.filter-fieldset-header h3 {
+  margin: 0;
+  color: #222;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.filter-field-actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.filter-field-actions button {
+  padding: 4px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 999px;
+  background: #fff;
+  color: #333;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filter-option-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 6px 10px;
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.filter-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  background: #fff;
+  color: #222;
+  font-size: 13px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.filter-option input {
+  margin: 0;
+}
+
+.filter-option-label {
+  overflow-wrap: anywhere;
+}
+
+.filter-option-count {
+  min-width: 1.6em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #445;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.filter-empty {
+  margin: 0;
+  color: #666;
+  font-size: 13px;
+}
+
+@media (max-width: 1120px) {
+  .filter-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .filter-summary {
+    text-align: right;
+  }
+}
+
+@media (max-width: 560px) {
+  .filter-row {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-summary {
+    text-align: left;
+  }
+
+  #filter-button {
+    padding: 7px 7px;
+    font-size: 12px;
+  }
+
+  .filter-toolbar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .compact-button {
+    padding: 7px 6px;
+    font-size: 12px;
+  }
+
+  .filter-option-list {
+    grid-template-columns: 1fr;
+    max-height: 260px;
+  }
+}
+
+/* Menu layout refinement and searchable one-column filters */
+.menu-section.dataset-section {
+  min-width: 0;
+}
+
+.dataset-row {
+  display: grid !important;
+  grid-template-columns: minmax(220px, 1fr) minmax(300px, 0.92fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.dataset-control {
+  min-width: 0 !important;
+}
+
+.dataset-button-group {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  justify-content: stretch;
+  align-items: stretch;
+}
+
+#dataset-add-button,
+#dataset-edit-button,
+#dataset-delete-button,
+#dataset-share-button,
+#dataset-register-button {
+  width: 100%;
+  min-width: 0 !important;
+  max-width: 100%;
+  padding-right: 6px;
+  padding-left: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .dataset-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .dataset-button-group {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .dataset-button-group {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 430px) {
+  .dataset-button-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.filter-modal-panel {
+  max-width: 640px;
+}
+
+.filter-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.filter-fieldset {
+  min-width: 0;
+}
+
+.filter-search-field {
+  display: grid;
+  gap: 4px;
+}
+
+.filter-search-field span {
+  color: #555;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.filter-search-field input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 10px;
+  background: #fff;
+  color: #222;
+  font: inherit;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.filter-option-list {
+  grid-template-columns: 1fr !important;
+  max-height: 260px;
+}
+
+.filter-option[hidden],
+.filter-empty[hidden] {
+  display: none !important;
+}
+
+/* Final overflow-safe layout for survey data actions and filter footer */
+.menu-section,
+.control-row,
+.dataset-section,
+.dataset-row,
+.dataset-control,
+.dataset-button-group {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.dataset-row {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  overflow: hidden;
+}
+
+.dataset-control {
+  width: 100% !important;
+  max-width: 100%;
+}
+
+#dataset-select {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+.dataset-button-group {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(min(72px, 100%), 1fr)) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  gap: 6px !important;
+  justify-content: stretch !important;
+  overflow: hidden;
+}
+
+#dataset-add-button,
+#dataset-edit-button,
+#dataset-delete-button,
+#dataset-share-button,
+#dataset-register-button,
+#reload-button,
+#reload-cancel-button {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  padding-right: 6px !important;
+  padding-left: 6px !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 430px) {
+  .dataset-button-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+#filter-modal .filter-modal-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 36px);
+  overflow: hidden;
+}
+
+#filter-modal .modal-header {
+  flex: 0 0 auto;
+}
+
+#filter-modal .filter-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+#filter-modal .modal-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  flex: 0 0 auto;
+  background: #fff;
+  box-shadow: 0 -8px 18px rgba(0, 0, 0, 0.06);
+}
+
+/* Final overflow-safe layout for map display controls */
+.menu-section.map-section,
+.map-section .control-row,
+.map-row,
+.basemap-control {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.menu-section.map-section {
+  overflow: hidden;
+}
+
+.map-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 6px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden;
+}
+
+.basemap-control {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 6px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden;
+}
+
+.basemap-control span {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+#basemap-select {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#reload-button,
+#reload-cancel-button {
+  width: auto !important;
+  min-width: 64px !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  padding-right: 10px !important;
+  padding-left: 10px !important;
+}
+
+@media (max-width: 520px) {
+  .map-row {
+    grid-template-columns: 1fr !important;
+    align-items: stretch !important;
+  }
+
+  .basemap-control {
+    grid-template-columns: auto minmax(0, 1fr) !important;
+  }
+
+  #reload-button,
+  #reload-cancel-button {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .basemap-control span {
+    display: none !important;
+  }
+
+  .basemap-control {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
