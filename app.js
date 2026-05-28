@@ -881,17 +881,6 @@
     return result;
   }
 
-  function markerShapeValuesFromLoadedRows(field) {
-    const normalizedField = normalizeDatasetFieldName(field);
-    if (!normalizedField || !state.rows.length) return [];
-    const values = new Set();
-    state.rows.forEach((record) => {
-      const value = normalizeText(record.__values?.[normalizedField]);
-      if (value) values.add(value);
-    });
-    return [...values].sort((a, b) => a.localeCompare(b, "ja"));
-  }
-
   function orderMarkerShapeValues(values, shapeMap = {}) {
     const available = new Set(values);
     const ordered = [];
@@ -978,12 +967,6 @@
       return;
     }
 
-    const loadedValues = markerShapeValuesFromLoadedRows(field);
-    if (loadedValues.length) {
-      renderMarkerShapeMap(loadedValues, shapeMap);
-      return;
-    }
-
     let draftDataset;
     try {
       draftDataset = normalizeDatasetInput(
@@ -1041,7 +1024,7 @@
     populateDatasetFieldSelect(datasetScientificNameFieldSelect, datasetModalHeaders, scientificNameField);
     populateDatasetFieldSelect(datasetMarkerShapeFieldSelect, datasetModalHeaders, markerShapeField);
     populateDatasetFieldSelect(datasetPopupTitleFieldSelect, datasetModalHeaders, popupTitleField);
-    renderMarkerShapeMap(markerShapeValuesFromLoadedRows(markerShapeField), configuredMarkerShapeMap(existing));
+    renderMarkerShapeMap([], configuredMarkerShapeMap(existing));
 
     const popupAvailable = availablePopupFields(datasetModalHeaders);
     const popupSelected = configuredPopupFields(existing, datasetModalHeaders);
@@ -1058,7 +1041,7 @@
 
     setDatasetFieldSettingsVisible(true);
     setDatasetFieldsStatus("列を読み込みました。位置情報、マーカーの色や形、ポップアップ、フィルター項目を変更できます。", false);
-    if (markerShapeField && !markerShapeValuesFromLoadedRows(markerShapeField).length) {
+    if (markerShapeField) {
       loadMarkerShapeValuesForModal();
     }
   }
