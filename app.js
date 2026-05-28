@@ -3807,9 +3807,9 @@
     // 優先度の低いマーカーから描画し、高いマーカーを前面に出す。
     const renderGroups = [...groups].sort((a, b) => getMarkerGroupPriority(a) - getMarkerGroupPriority(b));
 
-    renderGroups.forEach((group) => {
+    renderGroups.forEach((group, index) => {
       const element = createMarkerElement(group);
-      element.style.zIndex = String(100 + getMarkerGroupPriority(group));
+      element.style.zIndex = String(100 + Math.min(index, 99));
       const marker = new maplibregl.Marker({ element })
         .setLngLat(markerGroupLngLat(group))
         .addTo(state.map);

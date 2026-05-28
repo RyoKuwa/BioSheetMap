@@ -2790,3 +2790,29 @@ body.modal-open {
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }
+
+/* Layer order: markers stay below app UI, popups, legends, and modal dialogs. */
+.maplibregl-marker.record-marker {
+  z-index: 100;
+}
+
+#topbar,
+.topbar-open-button,
+.maplibregl-ctrl-top-right,
+.maplibregl-ctrl-top-left,
+.maplibregl-ctrl-bottom-right,
+.maplibregl-ctrl-bottom-left {
+  z-index: 1000 !important;
+}
+
+#legend {
+  z-index: 2000 !important;
+}
+
+.maplibregl-popup {
+  z-index: 3000 !important;
+}
+
+.modal-overlay {
+  z-index: 10000 !important;
+}
