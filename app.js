@@ -188,7 +188,7 @@
   const datasetScientificNameFieldSelect = document.getElementById("dataset-scientific-name-field-select");
   const datasetMarkerShapeFieldSelect = document.getElementById("dataset-marker-shape-field-select");
   const datasetMarkerShapeMap = document.getElementById("dataset-marker-shape-map");
-  const datasetPopupTitleFieldSelect = document.getElementById("dataset-popup-title-field-select");
+  const datasetPopupTitleFieldsList = document.getElementById("dataset-popup-title-fields-list");
   const datasetPopupFieldsList = document.getElementById("dataset-popup-fields-list");
   const datasetFilterFieldsList = document.getElementById("dataset-filter-fields-list");
   const colorLegendTitleEl = document.getElementById("color-legend-title");
@@ -331,6 +331,8 @@
           scientificNameField: normalizeDatasetFieldName(dataset.scientificNameField),
           markerShapeField: normalizeDatasetFieldName(dataset.markerShapeField),
           markerShapeMap: normalizeMarkerShapeMap(dataset.markerShapeMap),
+          popupTitleFields: normalizeOptionalFieldList(dataset.popupTitleFields)
+            || normalizeOptionalFieldList([dataset.popupTitleField]),
           popupTitleField: normalizeDatasetFieldName(dataset.popupTitleField),
           popupFields: normalizeOptionalFieldList(dataset.popupFields),
           filterFields: normalizeOptionalFieldList(dataset.filterFields)
@@ -400,7 +402,7 @@
       scientificNameField: normalizeDatasetFieldName(params.get("fm_scientific")),
       markerShapeField: normalizeDatasetFieldName(params.get("fm_shape_field")),
       markerShapeMap: parseMarkerShapeMapParam(params.get("fm_shape_map")),
-      popupTitleField: normalizeDatasetFieldName(params.get("fm_popup_title")),
+      popupTitleFields: parseFieldListParam(params.get("fm_popup_title")),
       popupFields: parseFieldListParam(params.get("fm_popup")),
       filterFields: parseFieldListParam(params.get("fm_filter")),
       createdAt: new Date().toISOString(),
@@ -610,7 +612,7 @@
   }
 
   function fieldLabel(field) {
-    if (field === VIRTUAL_COORDINATES_FIELD) return "緯度, 経度 [Google Map]";
+    if (field === VIRTUAL_COORDINATES_FIELD) return "[Google Map]";
     return FILTER_FIELD_LABEL_OVERRIDES[field] || field;
   }
 
@@ -670,10 +672,11 @@
     return normalizeMarkerShapeMap(dataset?.markerShapeMap);
   }
 
-  function configuredPopupTitleField(dataset, headers = state.headers) {
-    const titleField = normalizeDatasetFieldName(dataset?.popupTitleField);
-    if (!titleField) return "";
-    return normalizeFieldsForHeaders([titleField], headers)[0] || "";
+  function configuredPopupTitleFields(dataset, headers = state.headers) {
+    const source = Array.isArray(dataset?.popupTitleFields)
+      ? dataset.popupTitleFields
+      : (dataset?.popupTitleField ? [dataset.popupTitleField] : []);
+    return normalizeFieldsForHeaders(source, headers);
   }
 
 
@@ -693,6 +696,7 @@
 
     const now = new Date().toISOString();
     const hasPopupFields = Array.isArray(settings.popupFields);
+    const hasPopupTitleFields = Array.isArray(settings.popupTitleFields);
     const hasFilterFields = Array.isArray(settings.filterFields);
     const hasLegendLabelFields = Array.isArray(settings.legendLabelFields);
     const latitudeField = normalizeDatasetFieldName(settings.latitudeField ?? existing?.latitudeField);
@@ -715,7 +719,12 @@
       scientificNameField: normalizeDatasetFieldName(settings.scientificNameField ?? existing?.scientificNameField),
       markerShapeField,
       markerShapeMap: markerShapeField ? normalizeMarkerShapeMap(settings.markerShapeMap ?? existing?.markerShapeMap) : {},
-      popupTitleField: normalizeDatasetFieldName(settings.popupTitleField ?? existing?.popupTitleField),
+      popupTitleFields: hasPopupTitleFields
+        ? uniqueFieldList(settings.popupTitleFields)
+        : (normalizeOptionalFieldList(existing?.popupTitleFields)
+          || normalizeOptionalFieldList([existing?.popupTitleField])
+          || []),
+      popupTitleField: "",
       popupFields: hasPopupFields ? uniqueFieldList(settings.popupFields) : normalizeOptionalFieldList(existing?.popupFields),
       filterFields: hasFilterFields ? uniqueFieldList(settings.filterFields) : normalizeOptionalFieldList(existing?.filterFields),
       createdAt: existing?.createdAt || now,
@@ -1016,14 +1025,19 @@
     const legendLabelFields = configuredLegendLabelFields(existing, datasetModalHeaders);
     const scientificNameField = configuredScientificNameField(existing, datasetModalHeaders);
     const markerShapeField = configuredMarkerShapeField(existing, datasetModalHeaders);
-    const popupTitleField = configuredPopupTitleField(existing, datasetModalHeaders);
+    const popupTitleFields = configuredPopupTitleFields(existing, datasetModalHeaders);
     populateDatasetFieldSelect(datasetLatitudeFieldSelect, datasetModalHeaders, latitudeField, "選択してください");
     populateDatasetFieldSelect(datasetLongitudeFieldSelect, datasetModalHeaders, longitudeField, "選択してください");
     populateDatasetFieldSelect(datasetColorFieldSelect, datasetModalHeaders, colorField);
     renderDatasetCheckboxList(datasetLegendLabelFieldsList, datasetModalHeaders, legendLabelFields, { reorder: true });
     populateDatasetFieldSelect(datasetScientificNameFieldSelect, datasetModalHeaders, scientificNameField);
     populateDatasetFieldSelect(datasetMarkerShapeFieldSelect, datasetModalHeaders, markerShapeField);
-    populateDatasetFieldSelect(datasetPopupTitleFieldSelect, datasetModalHeaders, popupTitleField);
+    renderDatasetCheckboxList(
+      datasetPopupTitleFieldsList,
+      orderedFieldsForSettings(datasetModalHeaders, popupTitleFields),
+      popupTitleFields,
+      { reorder: true }
+    );
     renderMarkerShapeMap([], configuredMarkerShapeMap(existing));
 
     const popupAvailable = availablePopupFields(datasetModalHeaders);
@@ -1094,7 +1108,9 @@
         scientificNameField: datasetModalExisting?.scientificNameField || "",
         markerShapeField: datasetModalExisting?.markerShapeField || "",
         markerShapeMap: configuredMarkerShapeMap(datasetModalExisting),
-        popupTitleField: datasetModalExisting?.popupTitleField || "",
+        popupTitleFields: Array.isArray(datasetModalExisting?.popupTitleFields)
+          ? datasetModalExisting.popupTitleFields
+          : (datasetModalExisting?.popupTitleField ? [datasetModalExisting.popupTitleField] : null),
         popupFields: Array.isArray(datasetModalExisting?.popupFields) ? datasetModalExisting.popupFields : null,
         filterFields: Array.isArray(datasetModalExisting?.filterFields) ? datasetModalExisting.filterFields : null
       };
@@ -1109,7 +1125,7 @@
       scientificNameField: datasetScientificNameFieldSelect?.value || "",
       markerShapeField: datasetMarkerShapeFieldSelect?.value || "",
       markerShapeMap: currentMarkerShapeMapFromModal(),
-      popupTitleField: datasetPopupTitleFieldSelect?.value || "",
+      popupTitleFields: readCheckedDatasetFields(datasetPopupTitleFieldsList) || [],
       popupFields: readCheckedDatasetFields(datasetPopupFieldsList) || [],
       filterFields: readCheckedDatasetFields(datasetFilterFieldsList) || []
     };
@@ -1766,8 +1782,8 @@
       url.searchParams.set("fm_shape_field", markerShapeField);
       url.searchParams.set("fm_shape_map", JSON.stringify(configuredMarkerShapeMap(dataset)));
     }
-    const popupTitleField = normalizeDatasetFieldName(dataset.popupTitleField);
-    if (popupTitleField) url.searchParams.set("fm_popup_title", popupTitleField);
+    const popupTitleFields = configuredPopupTitleFields(dataset, state.headers);
+    if (popupTitleFields.length) url.searchParams.set("fm_popup_title", JSON.stringify(popupTitleFields));
     if (Array.isArray(dataset.popupFields)) {
       url.searchParams.set("fm_popup", JSON.stringify(uniqueFieldList(dataset.popupFields)));
     }
@@ -2654,8 +2670,8 @@
     return value === COLOR_BY_UNKNOWN_KEY ? "未設定" : value;
   }
 
-  function activePopupTitleField() {
-    return configuredPopupTitleField(getActiveDataset(), state.headers);
+  function activePopupTitleFields() {
+    return configuredPopupTitleFields(getActiveDataset(), state.headers);
   }
 
   function getRecordColorValue(record) {
@@ -3654,7 +3670,7 @@
     configuredLegendLabelFields(dataset, headers).forEach((field) => addResolvedField(result, headers, field));
     addResolvedField(result, headers, configuredScientificNameField(dataset, headers));
     addResolvedField(result, headers, configuredMarkerShapeField(dataset, headers));
-    addResolvedField(result, headers, configuredPopupTitleField(dataset, headers));
+    configuredPopupTitleFields(dataset, headers).forEach((field) => addResolvedField(result, headers, field));
 
     configuredPopupFields(dataset, headers).forEach((field) => addResolvedField(result, headers, field));
     configuredFilterFields(dataset, headers).forEach((field) => addResolvedField(result, headers, field));
@@ -3998,8 +4014,11 @@
       }];
     }
 
+    const nonXRecords = records.filter((record) => normalizeMarkerShapeId(record.markerShape) !== "x");
+    const colorRecords = nonXRecords.length ? nonXRecords : records;
+
     const byValue = new Map();
-    records.forEach((record) => {
+    colorRecords.forEach((record) => {
       const key = getRecordColorValue(record);
       if (!byValue.has(key)) {
         byValue.set(key, []);
@@ -4312,26 +4331,31 @@
     const content = document.createElement("div");
     content.className = "popup-content";
 
-    const titleField = activePopupTitleField();
-    if (titleField) {
-      const rawTitleValue = titleField === COLUMNS.date
-        ? (record.date || joinDateParts(record))
-        : record?.__values?.[titleField];
-      const titleValue = displayText(rawTitleValue);
-      const title = document.createElement("div");
-      title.className = "popup-title";
-      const titleMarker = document.createElement("span");
-      titleMarker.className = "popup-title-marker";
-      titleMarker.innerHTML = popupMarkerSvg(record);
-      title.appendChild(titleMarker);
+    const titleFields = activePopupTitleFields();
+    if (titleFields.length) {
+      const titleHtml = titleFields
+        .map((field) => {
+          const rawValue = field === COLUMNS.date
+            ? (record.date || joinDateParts(record))
+            : record?.__values?.[field];
+          return normalizeText(rawValue) ? formatFieldValueHTML(field, rawValue) : "";
+        })
+        .filter(Boolean)
+        .join(" / ");
+      if (titleHtml) {
+        const title = document.createElement("div");
+        title.className = "popup-title";
+        const titleMarker = document.createElement("span");
+        titleMarker.className = "popup-title-marker";
+        titleMarker.innerHTML = popupMarkerSvg(record);
+        title.appendChild(titleMarker);
 
-      const titleText = document.createElement("span");
-      titleText.innerHTML = isScientificNameField(titleField) && normalizeText(rawTitleValue)
-        ? formatTaxonHTML(titleValue)
-        : escapeHtml(titleValue);
+        const titleText = document.createElement("span");
+        titleText.innerHTML = titleHtml;
 
-      title.appendChild(titleText);
-      content.appendChild(title);
+        title.appendChild(titleText);
+        content.appendChild(title);
+      }
     }
 
     configuredPopupFields(getActiveDataset(), state.headers).forEach((field) => {

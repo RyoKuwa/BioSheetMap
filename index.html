@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>BioSheetMap</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -143,9 +144,9 @@
               </section>
 
               <label class="modal-field" for="dataset-scientific-name-field-select">
-                <span>学名として斜体化する列</span>
+                <span>学名として自動斜体化を適用する列</span>
                 <select id="dataset-scientific-name-field-select"></select>
-                <small>選択した列がポップアップや凡例に表示されるとき、学名として斜体化します。</small>
+                <small>選択した列がポップアップや凡例に表示されるとき、学名として自動斜体化します。</small>
               </label>
 
               <section class="dataset-fieldset" aria-labelledby="dataset-marker-shape-fields-title">
@@ -153,7 +154,7 @@
                 <label class="modal-field" for="dataset-marker-shape-field-select">
                   <span>形状を分ける項目</span>
                   <select id="dataset-marker-shape-field-select"></select>
-                  <small>未選択の場合、すべて塗りつぶし丸で表示されます。複数の記録が近接して1つにまとめられる場合は、形状設定で上にある値ほど代表マーカーとして優先されます。</small>
+                  <small>未選択の場合、すべて塗りつぶし丸で表示されます。複数の記録が近接して1つにまとめられる場合は、形状設定で上にある値ほど代表マーカーとして優先されます。✕印と他の形が一緒に統合される場合、✕印側の色は代表マーカーの色分割に含めません。</small>
                 </label>
                 <div id="dataset-marker-shape-map" class="dataset-shape-map"></div>
               </section>
@@ -161,11 +162,11 @@
               <section class="dataset-fieldset" aria-labelledby="dataset-popup-fields-title">
                 <div id="dataset-popup-fields-title" class="dataset-fieldset-title">ポップアップに表示する項目</div>
                 <small>マーカーをクリックしたときに表示されるポップアップの内容を設定します。</small>
-                <label class="modal-field" for="dataset-popup-title-field-select">
-                  <span>ポップアップタイトルに使用する項目</span>
-                  <select id="dataset-popup-title-field-select"></select>
-                  <small>初期状態では未選択です。選択しない場合、タイトルは表示されません。</small>
-                </label>
+                <section class="dataset-fieldset" aria-labelledby="dataset-popup-title-fields-title">
+                  <div id="dataset-popup-title-fields-title" class="dataset-fieldset-title">ポップアップタイトルに使用する列</div>
+                  <small>未選択の場合、タイトルは表示されません。複数選ぶと、選んだ順に「 / 」でつないで表示します。</small>
+                  <div id="dataset-popup-title-fields-list" class="dataset-field-list"></div>
+                </section>
                 <small>本文に表示する項目を選択します。タイトル項目でも、本文でチェックされていれば本文にも表示します。↑↓で表示順を変更できます。</small>
                 <div id="dataset-popup-fields-list" class="dataset-field-list"></div>
               </section>
@@ -217,7 +218,7 @@
           <section class="help-content-section">
             <h3>この地図でできること</h3>
             <p>Googleスプレッドシートまたは公開CSVにまとめた記録を、地図上に表示できます。</p>
-            <p>地図ごとに、緯度・経度として使う列、マーカーの色分けに使う列、凡例ラベルに使う列、マーカー形状に使う列、学名として斜体化する列、ポップアップに表示する列、フィルターに使う列を設定できます。設定は閲覧者のブラウザに保存され、プルダウンから切り替えられます。スプレッドシートやCSVの記録データそのものは保存されません。</p>
+            <p>地図ごとに、緯度・経度として使う列、マーカーの色分けに使う列、凡例ラベルに使う列、マーカー形状に使う列、学名として自動斜体化を適用する列、ポップアップに表示する列、フィルターに使う列を設定できます。設定は閲覧者のブラウザに保存され、プルダウンから切り替えられます。スプレッドシートやCSVの記録データそのものは保存されません。</p>
           </section>
 
           <section class="help-content-section">
@@ -247,13 +248,13 @@
             <h3>4. 表示を調整する</h3>
             <p>登録後も、「編集」から表示設定を変更できます。</p>
             <p>色分けに使う列を選ばない場合、マーカーは灰色で表示されます。マーカー形状に使う列を選ばない場合、すべてのマーカーは塗りつぶし丸で表示されます。</p>
-            <p>凡例ラベルに使う列、学名として斜体化する列、ポップアップに表示する列、フィルターに使う列も変更できます。地図の読み込み時には、表示や絞り込みに必要な列だけを取得します。</p>
+            <p>凡例ラベルに使う列、学名として自動斜体化を適用する列、ポップアップに表示する列、フィルターに使う列も変更できます。地図の読み込み時には、表示や絞り込みに必要な列だけを取得します。</p>
           </section>
 
           <section class="help-content-section">
             <h3>5. 地図を見る</h3>
             <p>マーカーを押すと、記録のポップアップが開きます。</p>
-            <p>近い位置にある複数の記録は、1つの代表マーカーにまとめて表示されます。まとめられた記録は、ポップアップ内の「前へ」「次へ」で切り替えられます。</p>
+            <p>近い位置にある複数の記録は、1つの代表マーカーにまとめて表示されます。まとめられた記録は、ポップアップ内の「前へ」「次へ」で切り替えられます。✕印と他の形が一緒に統合される場合、✕印側の色は代表マーカーの色分割に含めません。</p>
             <p>複数の記録が1つの代表マーカーにまとめられる場合は、形状設定で上にある値が優先されます。</p>
             <p>現在地ボタンは、現地で自分の位置を確認するときの補助として使えます。フォーカスボタンを押すと、現在表示されている記録全体が地図に収まるように表示範囲が調整されます。</p>
           </section>
